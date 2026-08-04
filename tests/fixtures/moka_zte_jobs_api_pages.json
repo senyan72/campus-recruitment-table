@@ -1,0 +1,92 @@
+{
+  "aesIv": "de7c21ed8d6f50fe",
+  "pages": [
+    {
+      "offset": 0,
+      "jobs": [
+        {
+          "id": "ec6aeb49-d6dd-492f-a910-163b6d36a432",
+          "title": "AI算法工程师（未来领军）",
+          "hireMode": 2,
+          "publishedAt": "2026-07-01T00:00:00.000Z",
+          "openedAt": "2026-06-01T00:00:00.000Z",
+          "updatedAt": "2026-07-15T00:00:00.000Z",
+          "locations": [
+            {
+              "cityName": "深圳市",
+              "country": "中国"
+            }
+          ],
+          "status": "open"
+        },
+        {
+          "id": "c95b407f-3ef3-48d3-ad96-0c13c75471ba",
+          "title": "软件开发工程师（未来领军）",
+          "hireMode": 2,
+          "publishedAt": "2026-07-02T00:00:00.000Z",
+          "openedAt": "2026-06-01T00:00:00.000Z",
+          "updatedAt": "2026-07-15T00:00:00.000Z",
+          "locations": [
+            {
+              "cityName": "深圳市",
+              "country": "中国"
+            }
+          ],
+          "status": "open"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "title": "ZTE测试岗位3",
+          "hireMode": 2,
+          "publishedAt": "2026-07-03T00:00:00.000Z",
+          "openedAt": "2026-06-01T00:00:00.000Z",
+          "updatedAt": "2026-07-15T00:00:00.000Z",
+          "locations": [
+            {
+              "cityName": "深圳市",
+              "country": "中国"
+            }
+          ],
+          "status": "open"
+        }
+      ],
+      "total": 5
+    },
+    {
+      "offset": 3,
+      "jobs": [
+        {
+          "id": "00000000-0000-4000-8000-000000000003",
+          "title": "ZTE测试岗位4",
+          "hireMode": 2,
+          "publishedAt": "2026-07-04T00:00:00.000Z",
+          "openedAt": "2026-06-01T00:00:00.000Z",
+          "updatedAt": "2026-07-15T00:00:00.000Z",
+          "locations": [
+            {
+              "cityName": "深圳市",
+              "country": "中国"
+            }
+          ],
+          "status": "open"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000004",
+          "title": "ZTE测试岗位5",
+          "hireMode": 2,
+          "publishedAt": "2026-07-05T00:00:00.000Z",
+          "openedAt": "2026-06-01T00:00:00.000Z",
+          "updatedAt": "2026-07-15T00:00:00.000Z",
+          "locations": [
+            {
+              "cityName": "深圳市",
+              "country": "中国"
+            }
+          ],
+          "status": "open"
+        }
+      ],
+      "total": 5
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "state": "200",
+  "type": "success",
+  "data": {
+    "pageForm": {
+      "totalPage": 1,
+      "pageSize": 50,
+      "dataCount": 1,
+      "pageData": [
+        {
+          "postId": "decathlon_campus_001",
+          "postName": "2027届管理培训生",
+          "company": "迪卡侬中国",
+          "workPlaceStr": "全国",
+          "publishDate": "2026-03-18 10:00:00",
+          "publishFirstDate": "2026-03-18 10:00:00",
+          "recruitNumStr": "若干",
+          "postTypeName": "管培生",
+          "recruitType": 1,
+          "educationStr": "本科及以上",
+          "endDate": "2030-12-31 23:59:59"
+        }
+      ]
+    }
+  }
+}

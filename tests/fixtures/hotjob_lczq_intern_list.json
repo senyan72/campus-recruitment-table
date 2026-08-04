@@ -1,0 +1,37 @@
+{
+  "state": "200",
+  "type": "success",
+  "data": {
+    "pageForm": {
+      "totalPage": 1,
+      "pageSize": 50,
+      "dataCount": 2,
+      "pageData": [
+        {
+          "postId": "intern001",
+          "postName": "研究院-助理研究员（实习生）",
+          "company": "联储证券",
+          "workPlaceStr": "北京市-朝阳区",
+          "publishDate": "2025-06-13 09:12:37",
+          "recruitNumStr": "若干",
+          "postTypeName": "行业研究",
+          "recruitType": 12,
+          "educationStr": "本科及以上",
+          "endDate": "2030-12-31 23:59:59"
+        },
+        {
+          "postId": "intern002",
+          "postName": "投行/债券业务实习生",
+          "company": "联储证券",
+          "workPlaceStr": "上海市-浦东新区",
+          "publishDate": "2026-02-07 14:31:49",
+          "recruitNumStr": "2",
+          "postTypeName": "投行承做",
+          "recruitType": 12,
+          "educationStr": "硕士研究生",
+          "endDate": "2030-12-31 23:59:59"
+        }
+      ]
+    }
+  }
+}

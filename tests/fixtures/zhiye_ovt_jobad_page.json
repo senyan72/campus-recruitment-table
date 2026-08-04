@@ -1,0 +1,48 @@
+{
+  "Code": 200,
+  "Count": 10,
+  "Data": [
+    {
+      "Id": "eb6d8245-f452-4ab1-94e7-e139d2ab840e",
+      "JobAdId": 511187533,
+      "JobAdName": "模拟测试工程师-27届(J11638)",
+      "CategoryId": "2",
+      "LocNames": [],
+      "Duty": "1.负责芯片模拟模块功能与性能的测试，以及问题分析\n2.负责研究电子测量仪器的工作原理，以及约束电路性能的系统要素\n3.负责搭建高效准确的自动测试平台，负责芯片测试计划的准备，测试问题的整理跟踪与测试结果的汇总\n4.负责客户平台的性能与系统问题的解决与支持",
+      "Require": "1.电子电路与电磁专业背景，熟悉信号与系统和传输线相关理论\n2.要求具有很强的动手能力，熟悉常用仪器如万用表，示波器的使用\n3.熟悉C, Python等常用编程语言，熟悉硬件电路原理图与PCB Layout设计软件\n4.具有SerDes芯片测试经验的优先，具有汽车电子相关芯片测试经验的优先",
+      "ChangeDate": "2026-07-20T18:13:25",
+      "PostDate": "0001-01-01T00:00:00",
+      "HeadCount": 0,
+      "Salary": null,
+      "Degree": null
+    },
+    {
+      "Id": "2afde36b-260b-42b7-a5c7-f4b51e408860",
+      "JobAdId": 511187526,
+      "JobAdName": "SH111工艺整合工程师（硕博）(J11600)",
+      "CategoryId": "2",
+      "LocNames": [],
+      "Duty": "1. 负责CIS pixel工艺开发，熟悉半导体工艺整合、design rule、device tuning、pixel性能提升等\n2. 负责CIS产品tape out，熟悉fab tape out流程、NTO handling、WAT/CP数据分析\n3. 负责专项技术开发项目管理，协调各相关部门完成专项攻关项目",
+      "Require": "1. 硕士及以上学历，电子、集成电路、微电子相关专业\n2. 扎实的半导体器件理论知识，熟悉图像传感器CIS理论/工艺者优先\n3. 具有良好的英文口语及书面能力\n4. 具有较强的团队合作精神和沟通能力",
+      "ChangeDate": "2026-07-20T18:06:50",
+      "PostDate": "0001-01-01T00:00:00",
+      "HeadCount": 0,
+      "Salary": null,
+      "Degree": null
+    },
+    {
+      "Id": "40a4dc0e-c0ab-45f1-bb5e-34df07dc008a",
+      "JobAdId": 511185480,
+      "JobAdName": "SH101-Backend Design Engineer(J11754)",
+      "CategoryId": "2",
+      "LocNames": [],
+      "Duty": "\n1.负责全芯片或数字模块的布局布线部分\n2.负责全芯片或数字模块的时钟树生成和时序优化及验证\n3.负责全芯片或数字模块的物理验证包括DRC, LVS, ANT, LVL, RTO等\n4.负责全芯片或数字模块的电压降分析\n",
+      "Require": "1.硕士学历，扎实的数字电路基础知识，熟悉计算机体系结构\n2.熟练掌握C/C++，Python，Perl，TCL等其中一种或多种编程语言\n3.了解Verilog硬件设计语言，了解集成电路设计的基本流程和概念\n4.良好的英语书面和口头表达能力\n",
+      "ChangeDate": "2026-07-13T16:51:43",
+      "PostDate": "0001-01-01T00:00:00",
+      "HeadCount": 0,
+      "Salary": null,
+      "Degree": null
+    }
+  ]
+}

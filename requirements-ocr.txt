@@ -1,0 +1,5 @@
+# 可选 OCR 兜底（详情页几乎无正文时）
+# 安装: pip install -r requirements-ocr.txt
+# 并在 %LOCALAPPDATA%\campus-jobs\config.json 设置 "ocr_enabled": true
+rapidocr-onnxruntime>=1.3.0
+onnxruntime>=1.16.0

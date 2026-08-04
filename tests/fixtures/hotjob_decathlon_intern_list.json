@@ -1,0 +1,78 @@
+{
+  "state": "200",
+  "type": "success",
+  "data": {
+    "pageForm": {
+      "totalPage": 1,
+      "pageSize": 50,
+      "dataCount": 5,
+      "pageData": [
+        {
+          "postId": "6a6c060aba2dc64cbb941064",
+          "postName": "色彩与平面实习生",
+          "company": "迪卡侬中国",
+          "workPlaceStr": "上海市",
+          "publishDate": "2026-07-15 10:00:00",
+          "publishFirstDate": "2026-07-15 10:00:00",
+          "recruitNumStr": "1",
+          "postTypeName": "设计",
+          "recruitType": 12,
+          "educationStr": "本科及以上",
+          "endDate": "2030-12-31 23:59:59"
+        },
+        {
+          "postId": "6a69c83b53b4650cd34cd68a",
+          "postName": "迪卡侬零售支持财务分析部门实习生",
+          "company": "迪卡侬中国",
+          "workPlaceStr": "上海",
+          "publishDate": "2026-06-20 09:30:00",
+          "publishFirstDate": "2026-06-20 09:30:00",
+          "recruitNumStr": "1",
+          "postTypeName": "财务",
+          "recruitType": 12,
+          "educationStr": "本科及以上",
+          "endDate": "2030-12-31 23:59:59"
+        },
+        {
+          "postId": "decathlon_intern_003",
+          "postName": "电商运营实习生",
+          "company": "迪卡侬中国",
+          "workPlaceStr": "上海市-浦东新区",
+          "publishDate": "2026-05-08 14:00:00",
+          "publishFirstDate": "2026-05-08 14:00:00",
+          "recruitNumStr": "2",
+          "postTypeName": "运营",
+          "recruitType": 12,
+          "educationStr": "本科及以上",
+          "endDate": "2030-12-31 23:59:59"
+        },
+        {
+          "postId": "decathlon_intern_004",
+          "postName": "运动产品开发实习生",
+          "company": "迪卡侬中国",
+          "workPlaceStr": "上海",
+          "publishDate": "2026-04-12 11:20:00",
+          "publishFirstDate": "2026-04-12 11:20:00",
+          "recruitNumStr": "若干",
+          "postTypeName": "产品",
+          "recruitType": 12,
+          "educationStr": "本科及以上",
+          "endDate": "2030-12-31 23:59:59"
+        },
+        {
+          "postId": "decathlon_intern_005",
+          "postName": "人力资源实习生",
+          "company": "迪卡侬中国",
+          "workPlaceStr": "上海",
+          "publishDate": "2026-03-01 16:45:00",
+          "publishFirstDate": "2026-03-01 16:45:00",
+          "recruitNumStr": "1",
+          "postTypeName": "人力资源",
+          "recruitType": 12,
+          "educationStr": "本科及以上",
+          "endDate": "2030-12-31 23:59:59"
+        }
+      ]
+    }
+  }
+}
