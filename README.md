@@ -1,0 +1,2 @@
+# campus-recruitment-table
+设计分为admin端和viewer端，admin端完成数据采集，审核并同步到云端；viewer端主要是查看岗位信息并手动更新岗位投递进度
