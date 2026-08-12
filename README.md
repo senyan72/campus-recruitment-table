@@ -1,15 +1,21 @@
 
-# campus-recruitment-table
+# 校招求职表应用程序
+
 设计分为admin端和viewer端，admin端完成数据采集，审核并同步到云端；viewer端主要是查看岗位信息并手动更新岗位投递进度
 
-# 校招求职表（Windows 桌面版）
-
 用于收集、整理和查看校园招聘/实习岗位的 Windows 桌面应用。可完全离线运行，也可连接你自己创建的 Supabase 项目进行同步。
+
+> **目录约定**：本仓库对应本机项目文件夹 `校招求职表应用程序`。`campus_recruitment` 等旧目录已废弃，请勿再使用。同步说明见 [`docs/WINDOWS_SYNC_AI.md`](docs/WINDOWS_SYNC_AI.md)。
 
 ## 功能
 
 - **Viewer**：查看岗位、筛选、打开原始链接、维护本机投递进度和导出 CSV。
 - **Admin**：导入种子表、探测招聘来源、采集岗位、审核并发布到云端、管理 Viewer 账号。
+- **AI 陪伴（coach）**：证据链、准备度、岗位匹配解释、简历多场景建议、文字模拟面试；**不含人工教练**。详见 [`docs/coach_ai_companion.md`](docs/coach_ai_companion.md)。
+  - **推荐入口（桌面 Viewer）**：`python -m app.main --mode viewer` → 顶部页签 **「AI 陪伴」**
+  - 可选独立 H5：`python -m app.main --mode coach` → http://127.0.0.1:8787/coach
+  - **本机旧工程没有 AI 页签？** 在 `校招求职表应用程序` 目录按 [`docs/WINDOWS_SYNC_AI.md`](docs/WINDOWS_SYNC_AI.md) 同步（勿使用已废弃的 `campus_recruitment` 目录）。
+
 - **深度采集限额**：启动深度采集时可输入本次最多处理的企业数，默认 20 家；可分批运行，减少卡顿。
 - **本地优先**：没有云端配置时仍可使用本地 SQLite；个人投递记录默认不会上传。
 
@@ -34,7 +40,11 @@ pip install -r requirements.txt
 ```powershell
 python -m app.main --mode viewer
 python -m app.main --mode admin
+$env:COACH_FORCE_RULES="1"
+python -m app.main --mode coach --host 127.0.0.1 --port 8787
 ```
+
+AI 陪伴页：http://127.0.0.1:8787/coach
 
 5. 在 Admin 中创建至少一个 Viewer 账号并推送到云端，再把同一项目的 URL/anon key 提供给其他使用者。
 

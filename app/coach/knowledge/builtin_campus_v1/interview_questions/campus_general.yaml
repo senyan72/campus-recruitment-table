@@ -1,0 +1,83 @@
+questions:
+  - id: cg_intro
+    track: campus_general
+    stage: behavioral
+    question: 请用两分钟做自我介绍，并说明你为什么适合这个岗位。
+    intent: 考察结构化表达与岗位关联
+    followups:
+      - 刚才提到的项目里，你个人独立负责的部分是什么？
+      - 如果只能保留一个亮点给面试官，你会留哪一个？
+    good_signals:
+      - 有时间线
+      - 有个人贡献
+      - 主动对齐 JD 关键词
+    risk_flags:
+      - 只背诵简历
+      - 无证据的夸张数据
+    source: builtin
+  - id: cg_project
+    track: campus_general
+    stage: project
+    question: 选一个你最有代表性的项目/实习，讲清楚背景、你的行动和结果。
+    intent: 项目深挖与证据完整性
+    followups:
+      - 遇到的最大困难是什么？你怎么解决的？
+      - 结果如何验证？有没有可核对的指标或产出物？
+    good_signals:
+      - STAR 结构
+      - 能量化或可核验产出
+    risk_flags:
+      - 团队成果说成个人
+      - 编造指标
+    source: builtin
+  - id: cg_weakness
+    track: campus_general
+    stage: behavioral
+    question: 你目前求职准备上最大的短板是什么？你打算怎么补？
+    intent: 自我认知与行动计划
+    followups:
+      - 过去两周你为此做过什么具体行动？
+    good_signals:
+      - 具体短板
+      - 可执行补强
+    risk_flags:
+      - 假谦虚
+      - 无行动
+    source: builtin
+  - id: cg_conflict
+    track: campus_general
+    stage: behavioral
+    question: 讲一次你与同学/同事意见不合，但最终推进了事情的经历。
+    intent: 协作与沟通
+    followups:
+      - 对方的立场是什么？你做了哪些取舍？
+    good_signals:
+      - 尊重对方
+      - 有结果
+    risk_flags:
+      - 抱怨他人
+    source: builtin
+  - id: cg_why
+    track: campus_general
+    stage: motivation
+    question: 为什么投这个公司/方向？你做了哪些了解？
+    intent: 动机真实性
+    followups:
+      - 如果拿不到这个方向，你的备选是什么？
+    good_signals:
+      - 有具体信息源
+      - 与自身证据相关
+    risk_flags:
+      - 空泛热爱
+    source: builtin
+  - id: cg_ask
+    track: campus_general
+    stage: closing
+    question: 你有什么想问面试官的？
+    intent: 反问质量
+    followups: []
+    good_signals:
+      - 问团队节奏/成长/业务挑战
+    risk_flags:
+      - 只问薪资福利
+    source: builtin

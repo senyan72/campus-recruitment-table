@@ -25,6 +25,7 @@ from app.config import APP_VERSION, load_config, save_config
 from app.db.local import LocalDB, MY_PICK_CAMPUS
 from app.sync.supabase import SupabaseSync
 from app.ui.account_login import require_viewer_login
+from app.ui.coach_viewer import CoachCompanionFrame
 from app.ui.export_csv import export_jobs_csv
 from app.ui.job_review import display_page_updated_at
 from app.ui.tree_check import (
@@ -129,6 +130,7 @@ class ViewerApp(ctk.CTk):
         )
         self.jobs: list[dict[str, Any]] = []
         self._selected_job_id: str | None = None
+        self.coach_frame: CoachCompanionFrame | None = None
 
         self._build()
         self.after(200, self.refresh_table)
@@ -147,7 +149,7 @@ class ViewerApp(ctk.CTk):
         ).pack(side="left", padx=(18, 12), pady=14)
         ctk.CTkLabel(
             header,
-            text="岗位检索与投递进度",
+            text="岗位检索 · 投递进度 · AI 陪伴",
             font=ctk.CTkFont(size=12),
             text_color="#64748b",
         ).pack(side="left", pady=14)
@@ -159,8 +161,30 @@ class ViewerApp(ctk.CTk):
             text_color="#64748b",
         ).pack(side="right", padx=18, pady=14)
 
-        scope = ctk.CTkFrame(self, fg_color="#ffffff", corner_radius=10, border_width=1, border_color="#dbe3ec")
-        scope.pack(fill="x", padx=14, pady=4)
+        self.main_tabs = ctk.CTkTabview(self, fg_color="transparent")
+        self.main_tabs.pack(fill="both", expand=True, padx=10, pady=(0, 4))
+        self.main_tabs.add("岗位投递")
+        self.main_tabs.add("AI 陪伴")
+        jobs_tab = self.main_tabs.tab("岗位投递")
+        coach_tab = self.main_tabs.tab("AI 陪伴")
+
+        self._build_jobs_tab(jobs_tab)
+        self.coach_frame = CoachCompanionFrame(
+            coach_tab,
+            account=self.logged_in_account or "viewer",
+            get_selected_job=self._current_job,
+        )
+        self.coach_frame.pack(fill="both", expand=True, padx=4, pady=4)
+
+        bottom = ctk.CTkFrame(self, fg_color="#e8eef5", corner_radius=8)
+        bottom.pack(fill="x", padx=14, pady=(0, 12))
+        ctk.CTkLabel(bottom, textvariable=self.status_var, anchor="w", text_color="#475569").pack(
+            side="left", fill="x", expand=True, padx=12, pady=7
+        )
+
+    def _build_jobs_tab(self, parent: Any) -> None:
+        scope = ctk.CTkFrame(parent, fg_color="#ffffff", corner_radius=10, border_width=1, border_color="#dbe3ec")
+        scope.pack(fill="x", padx=4, pady=4)
         ctk.CTkLabel(scope, text="岗位范围", font=ctk.CTkFont(size=12, weight="bold"), text_color="#334155").pack(
             side="left", padx=(18, 12), pady=11
         )
@@ -169,8 +193,8 @@ class ViewerApp(ctk.CTk):
                 scope, text=label, variable=self.bucket_var, value=label, command=self.refresh_table
             ).pack(side="left", padx=7, pady=11)
 
-        filters = ctk.CTkFrame(self, fg_color="#ffffff", corner_radius=10, border_width=1, border_color="#dbe3ec")
-        filters.pack(fill="x", padx=14, pady=4)
+        filters = ctk.CTkFrame(parent, fg_color="#ffffff", corner_radius=10, border_width=1, border_color="#dbe3ec")
+        filters.pack(fill="x", padx=4, pady=4)
         ctk.CTkLabel(filters, text="筛选条件", font=ctk.CTkFont(size=12, weight="bold"), text_color="#334155").pack(
             side="left", padx=(18, 12), pady=12
         )
@@ -215,8 +239,8 @@ class ViewerApp(ctk.CTk):
             command=lambda _value: self.refresh_table(),
         ).pack()
 
-        actions = ctk.CTkFrame(self, fg_color="transparent")
-        actions.pack(fill="x", padx=14, pady=(4, 8))
+        actions = ctk.CTkFrame(parent, fg_color="transparent")
+        actions.pack(fill="x", padx=4, pady=(4, 8))
         ctk.CTkLabel(actions, text="批量操作", font=ctk.CTkFont(size=12, weight="bold"), text_color="#64748b").pack(
             side="left", padx=(4, 12)
         )
@@ -227,9 +251,18 @@ class ViewerApp(ctk.CTk):
         ctk.CTkButton(actions, text="移出个人校招投递", width=128, height=34, fg_color="#64748b", hover_color="#475569", command=self.remove_from_my_pick).pack(side="left", padx=3)
         ctk.CTkButton(actions, text="全选", width=68, height=34, fg_color="#e8eef5", text_color="#334155", hover_color="#dbe5ef", command=self.select_all_rows).pack(side="left", padx=(16, 3))
         ctk.CTkButton(actions, text="取消全选", width=82, height=34, fg_color="#e8eef5", text_color="#334155", hover_color="#dbe5ef", command=self.clear_row_selection).pack(side="left", padx=3)
+        ctk.CTkButton(
+            actions,
+            text="AI 匹配选中岗",
+            width=120,
+            height=34,
+            fg_color="#1d4ed8",
+            hover_color="#1e40af",
+            command=self.open_ai_match_for_selection,
+        ).pack(side="left", padx=(16, 3))
 
-        body = ctk.CTkFrame(self, fg_color="transparent")
-        body.pack(fill="both", expand=True, padx=14, pady=(0, 8))
+        body = ctk.CTkFrame(parent, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=4, pady=(0, 8))
 
         table_frame = ctk.CTkFrame(body, fg_color="#ffffff", corner_radius=10, border_width=1, border_color="#dbe3ec")
         table_frame.pack(side="left", fill="both", expand=True)
@@ -342,9 +375,16 @@ class ViewerApp(ctk.CTk):
         self.apply_menu.set("未投递")
         self.apply_menu.pack(side="left", padx=6)
 
-        bottom = ctk.CTkFrame(self, fg_color="#e8eef5", corner_radius=8)
-        bottom.pack(fill="x", padx=14, pady=(0, 12))
-        ctk.CTkLabel(bottom, textvariable=self.status_var, anchor="w", text_color="#475569").pack(side="left", fill="x", expand=True, padx=12, pady=7)
+    def open_ai_match_for_selection(self) -> None:
+        """从岗位表跳到 AI 陪伴匹配页，并填入当前选中岗位。"""
+        if not self._current_job():
+            messagebox.showinfo("提示", "请先选中一条岗位")
+            return
+        self.main_tabs.set("AI 陪伴")
+        if self.coach_frame is not None:
+            self.coach_frame.tabs.set("岗位匹配")
+            self.coach_frame.fill_job_from_selection()
+
 
     def clear_filters(self) -> None:
         """Clear free-text filters without changing the selected job scope."""
