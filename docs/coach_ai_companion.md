@@ -62,27 +62,92 @@ pip install pypdf python-docx python-multipart
 
 上传后可在 H5「我的」页管理，或通过 API `POST /v1/knowledge/documents/upload`（multipart `file` 字段）。
 
-## LLM 外接（可直接接入）
+## LLM 外接（Qwen / DeepSeek）
 
-`get_model_adapter()` 支持 OpenAI 兼容协议（通义 DashScope / DeepSeek / 自定义网关）。
+`get_model_adapter()` 支持 OpenAI 兼容协议。**默认规则引擎**；配置 Key 并关闭 `COACH_FORCE_RULES` 后，简历建议 / 匹配 / 准备度走 LLM。
+
+### 快速配置
+
+1. 复制 `.env.example` 为项目根 `.env`，填入 Key  
+2. 或直接设置环境变量后启动
+
+**通义千问（推荐中文主路径）**
 
 ```powershell
+# 申请：https://bailian.console.aliyun.com/ → API-KEY
 $env:COACH_FORCE_RULES="0"
-$env:COACH_LLM_PROVIDER="qwen"   # 或 deepseek / openai / openai_compatible
-$env:COACH_LLM_API_KEY="你的Key"
-# 可选覆盖：
-# $env:COACH_LLM_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
-# $env:COACH_LLM_MODEL="qwen-max"
-# 可选第二路由：
-# $env:COACH_LLM_FALLBACK_PROVIDER="deepseek"
-# $env:COACH_LLM_FALLBACK_API_KEY="..."
+$env:COACH_LLM_PROVIDER="qwen"
+$env:COACH_LLM_API_KEY="sk-你的百炼Key"
+# 可选模型：qwen-plus（默认）/ qwen-max / qwen3.7-plus
+# $env:COACH_LLM_MODEL="qwen-plus"
 ```
+
+**DeepSeek（推荐推理 / 成本敏感）**
+
+```powershell
+# 申请：https://platform.deepseek.com/
+$env:COACH_FORCE_RULES="0"
+$env:COACH_LLM_PROVIDER="deepseek"
+$env:COACH_LLM_API_KEY="sk-你的DeepSeekKey"
+# 默认 deepseek-v4-flash；更强：deepseek-v4-pro
+# 注意：旧名 deepseek-chat / deepseek-reasoner 已退役，代码会自动迁移
+```
+
+**主备双路由（Qwen 失败 → DeepSeek）**
+
+```powershell
+$env:COACH_LLM_PROVIDER="qwen"
+$env:COACH_LLM_API_KEY="sk-qwen"
+$env:COACH_LLM_FALLBACK_PROVIDER="deepseek"
+$env:COACH_LLM_FALLBACK_API_KEY="sk-deepseek"
+```
+
+也可使用厂商原生变量：`DASHSCOPE_API_KEY` / `DEEPSEEK_API_KEY`（未设 `COACH_LLM_API_KEY` 时生效）。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/v1/llm/status` | 是否就绪、provider/model（不回传密钥） |
-| POST | `/v1/llm/complete-json` | 登录后直接试调 JSON 生成；可 `include_knowledge=true` 注入知识库 |
+| GET | `/v1/llm/status` | 是否就绪、provider/model、申请与计费指引 |
+| POST | `/v1/llm/complete-json` | 登录后试调 JSON；可 `include_knowledge=true` |
 
-系统提示默认强制：**无已确认事实不编造、禁止录用概率话术**。LLM 不可用时 workflow 自动回退规则引擎。
+系统提示强制：**无已确认事实不编造、禁止录用概率话术**。LLM 不可用时 workflow 自动回退规则引擎。调用日志写入 `llm_call_logs`（含 token 用量）。
 
-环境变量：`COACH_LLM_API_KEY`、`COACH_LLM_PROVIDER`、`COACH_LLM_BASE_URL`、`COACH_LLM_MODEL`、`COACH_FORCE_RULES`
+### 如何收费（按量 Token，以官网为准）
+
+双方都是 **先充值/开通，再按调用 Token 计费**；网页聊天免费 ≠ API 免费。
+
+#### 通义千问（阿里云百炼，人民币）
+
+控制台：https://bailian.console.aliyun.com/  
+价目：https://help.aliyun.com/zh/model-studio/model-pricing  
+
+| 模型 | 输入 | 输出 | 说明 |
+|---|---|---|---|
+| `qwen-plus`（默认） | 约 **0.8 元**/百万 tokens | 约 **2 元**/百万 tokens | ≤128K、非思考模式；新用户常有免费额度 |
+| `qwen-max` | 约 **2.4 元**/百万 tokens | 约 **9.6 元**/百万 tokens | 质量更高、更贵 |
+
+长上下文有阶梯加价；思考模式输出更贵。正式账单以控制台为准。
+
+**粗算**：一次简历建议约 2k–6k tokens，用 `qwen-plus` 大约 **不到 0.01 元/次** 量级。
+
+#### DeepSeek（美元）
+
+控制台：https://platform.deepseek.com/  
+价目：https://api-docs.deepseek.com/quick_start/pricing  
+
+| 模型 | 输入（cache miss） | 输入（cache hit） | 输出 |
+|---|---|---|---|
+| `deepseek-v4-flash`（默认） | **$0.14**/百万 | **$0.0028**/百万 | **$0.28**/百万 |
+| `deepseek-v4-pro` | **$0.435**/百万 | **$0.003625**/百万 | **$0.87**/百万 |
+
+**粗算**：同样一次建议用 Flash，大约 **不到 $0.002/次** 量级。
+
+#### 产品建议
+
+| 场景 | 建议 |
+|---|---|
+| 日常中文陪伴主路径 | **Qwen `qwen-plus`** |
+| 证据链/结构化推理、控成本 | **DeepSeek `deepseek-v4-flash`** |
+| 质量优先试点 | Qwen `qwen-max` 或 DeepSeek `deepseek-v4-pro` |
+| 稳妥上线 | 主 Qwen + Fallback DeepSeek |
+
+价格可能调整，上线前请再核对官网价目表。

@@ -13,28 +13,83 @@ import httpx
 PROVIDER_PRESETS: dict[str, dict[str, str]] = {
     "qwen": {
         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "model": "qwen-max",
+        "model": "qwen-plus",
         "label": "通义千问（DashScope OpenAI 兼容）",
+        "key_env": "DASHSCOPE_API_KEY",
     },
     "dashscope": {
         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "model": "qwen-max",
+        "model": "qwen-plus",
         "label": "通义千问（DashScope）",
+        "key_env": "DASHSCOPE_API_KEY",
+    },
+    "qwen_max": {
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "model": "qwen-max",
+        "label": "通义千问 Max",
+        "key_env": "DASHSCOPE_API_KEY",
     },
     "deepseek": {
         "base_url": "https://api.deepseek.com/v1",
-        "model": "deepseek-chat",
-        "label": "DeepSeek",
+        "model": "deepseek-v4-flash",
+        "label": "DeepSeek V4 Flash",
+        "key_env": "DEEPSEEK_API_KEY",
+    },
+    "deepseek_pro": {
+        "base_url": "https://api.deepseek.com/v1",
+        "model": "deepseek-v4-pro",
+        "label": "DeepSeek V4 Pro",
+        "key_env": "DEEPSEEK_API_KEY",
     },
     "openai": {
         "base_url": "https://api.openai.com/v1",
         "model": "gpt-4o-mini",
         "label": "OpenAI",
+        "key_env": "OPENAI_API_KEY",
     },
     "openai_compatible": {
         "base_url": "",
         "model": "",
         "label": "自定义 OpenAI 兼容端点",
+        "key_env": "",
+    },
+}
+
+# 产品推荐与计费参考（非实时拉取；以官网为准）
+PROVIDER_GUIDE: dict[str, Any] = {
+    "qwen": {
+        "console": "https://bailian.console.aliyun.com/",
+        "docs": "https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope",
+        "pricing_docs": "https://help.aliyun.com/zh/model-studio/model-pricing",
+        "recommended_models": ["qwen-plus", "qwen-max", "qwen3.7-plus"],
+        "default_for": "中文自然表达 + 校招陪伴主路径",
+        "billing_note": "按 Token 计费（人民币）；新用户常有免费额度，以控制台为准",
+        "approx_price_cny_per_1m_tokens": {
+            "qwen-plus": {"input": 0.8, "output": 2.0, "unit": "元/百万tokens", "mode": "≤128K 非思考"},
+            "qwen-max": {"input": 2.4, "output": 9.6, "unit": "元/百万tokens", "mode": "非思考"},
+        },
+    },
+    "deepseek": {
+        "console": "https://platform.deepseek.com/",
+        "docs": "https://api-docs.deepseek.com/",
+        "pricing_docs": "https://api-docs.deepseek.com/quick_start/pricing",
+        "recommended_models": ["deepseek-v4-flash", "deepseek-v4-pro"],
+        "default_for": "证据链推理 / 结构化 JSON / 成本敏感回退",
+        "billing_note": "按 Token 计费（USD）；旧名 deepseek-chat 已退役，请用 v4-flash/pro",
+        "approx_price_usd_per_1m_tokens": {
+            "deepseek-v4-flash": {
+                "input_cache_miss": 0.14,
+                "input_cache_hit": 0.0028,
+                "output": 0.28,
+                "unit": "USD/百万tokens",
+            },
+            "deepseek-v4-pro": {
+                "input_cache_miss": 0.435,
+                "input_cache_hit": 0.003625,
+                "output": 0.87,
+                "unit": "USD/百万tokens",
+            },
+        },
     },
 }
 
@@ -46,6 +101,23 @@ EVIDENCE_SYSTEM_PREFIX = """你是校招 AI 求职陪伴助手。必须遵守：
 """
 
 
+def _resolve_api_key(*, provider: str, api_key: str | None, preset: dict[str, str]) -> str:
+    if api_key is not None and str(api_key).strip():
+        return str(api_key).strip()
+    primary = (os.environ.get("COACH_LLM_API_KEY") or "").strip()
+    if primary:
+        return primary
+    key_env = (preset.get("key_env") or "").strip()
+    if key_env:
+        return (os.environ.get(key_env) or "").strip()
+    # 常见别名兜底
+    if provider in {"qwen", "dashscope", "qwen_max"}:
+        return (os.environ.get("DASHSCOPE_API_KEY") or "").strip()
+    if provider in {"deepseek", "deepseek_pro"}:
+        return (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
+    return ""
+
+
 def resolve_provider_config(
     *,
     provider: str | None = None,
@@ -54,14 +126,29 @@ def resolve_provider_config(
     model: str | None = None,
 ) -> dict[str, str]:
     prov = (provider or os.environ.get("COACH_LLM_PROVIDER") or "").strip().lower()
-    key = (api_key if api_key is not None else os.environ.get("COACH_LLM_API_KEY") or "").strip()
+    # 兼容别名
+    aliases = {
+        "通义": "qwen",
+        "千问": "qwen",
+        "tongyi": "qwen",
+        "aliyun": "qwen",
+        "bailian": "qwen",
+        "ds": "deepseek",
+        "deepseek-chat": "deepseek",
+        "deepseek-reasoner": "deepseek_pro",
+    }
+    prov = aliases.get(prov, prov)
     preset = PROVIDER_PRESETS.get(prov, {})
+    key = _resolve_api_key(provider=prov, api_key=api_key, preset=preset)
     url = (base_url if base_url is not None else os.environ.get("COACH_LLM_BASE_URL") or "").strip()
     mdl = (model if model is not None else os.environ.get("COACH_LLM_MODEL") or "").strip()
     if not url:
         url = (preset.get("base_url") or "").strip()
     if not mdl:
         mdl = (preset.get("model") or "").strip()
+    # 旧模型名自动迁移
+    if mdl in {"deepseek-chat", "deepseek-reasoner"}:
+        mdl = "deepseek-v4-flash" if mdl == "deepseek-chat" else "deepseek-v4-pro"
     return {
         "provider": prov,
         "api_key": key,
@@ -109,7 +196,9 @@ def chat_completions_json(
         provider=provider, api_key=api_key, base_url=base_url, model=model
     )
     if not cfg["api_key"]:
-        raise RuntimeError("缺少 COACH_LLM_API_KEY")
+        raise RuntimeError(
+            "缺少 API Key：请设置 COACH_LLM_API_KEY，或 DASHSCOPE_API_KEY / DEEPSEEK_API_KEY"
+        )
     if not cfg["base_url"] or not cfg["model"]:
         raise RuntimeError("缺少 COACH_LLM_BASE_URL 或 COACH_LLM_MODEL（或未识别的 PROVIDER 预置）")
 
@@ -134,13 +223,16 @@ def chat_completions_json(
     }
     with httpx.Client(timeout=timeout) as client:
         resp = client.post(url, headers=headers, json=payload)
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            detail = resp.text[:500]
+            raise RuntimeError(f"LLM HTTP {resp.status_code}: {detail}")
         body = resp.json()
     try:
         content = body["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as e:
         raise ValueError(f"LLM 响应结构异常: {body!r}") from e
     parsed = _extract_json_object(content if isinstance(content, str) else json.dumps(content))
+    usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
     parsed.setdefault("_meta", {})
     if isinstance(parsed["_meta"], dict):
         parsed["_meta"].update(
@@ -149,6 +241,9 @@ def chat_completions_json(
                 "model": cfg["model"],
                 "task": task,
                 "schema_name": schema_name,
+                "prompt_tokens": usage.get("prompt_tokens"),
+                "completion_tokens": usage.get("completion_tokens"),
+                "total_tokens": usage.get("total_tokens"),
             }
         )
     return parsed
@@ -162,12 +257,12 @@ def llm_status() -> dict[str, Any]:
     }
     primary = resolve_provider_config()
     fallback_provider = (os.environ.get("COACH_LLM_FALLBACK_PROVIDER") or "").strip().lower()
-    fallback_key = (os.environ.get("COACH_LLM_FALLBACK_API_KEY") or primary["api_key"]).strip()
+    fallback_key = (os.environ.get("COACH_LLM_FALLBACK_API_KEY") or "").strip() or None
     fallback = None
     if fallback_provider:
         fallback = resolve_provider_config(
             provider=fallback_provider,
-            api_key=fallback_key or None,
+            api_key=fallback_key,
             base_url=(os.environ.get("COACH_LLM_FALLBACK_BASE_URL") or None),
             model=(os.environ.get("COACH_LLM_FALLBACK_MODEL") or None),
         )
@@ -194,4 +289,9 @@ def llm_status() -> dict[str, Any]:
             else None
         ),
         "supported_providers": sorted(PROVIDER_PRESETS.keys()),
+        "guides": PROVIDER_GUIDE,
+        "setup_hint": (
+            "设置 COACH_FORCE_RULES=0，并配置 COACH_LLM_PROVIDER=qwen|deepseek "
+            "与 COACH_LLM_API_KEY（或 DASHSCOPE_API_KEY / DEEPSEEK_API_KEY）"
+        ),
     }

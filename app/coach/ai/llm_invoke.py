@@ -23,12 +23,15 @@ def log_llm_call(
     provider: str = "",
     model: str = "",
     error: str = "",
+    prompt_tokens: int | None = None,
+    completion_tokens: int | None = None,
+    total_tokens: int | None = None,
 ) -> None:
     if not db:
         return
     try:
         db.execute(
-            "INSERT INTO llm_call_logs(id, task, schema_name, provider, model, ok, fallback, latency_ms, error, created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO llm_call_logs(id, task, schema_name, provider, model, ok, fallback, latency_ms, error, prompt_tokens, completion_tokens, total_tokens, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 db.new_id("llm_"),
                 task,
@@ -39,6 +42,9 @@ def log_llm_call(
                 1 if fallback else 0,
                 latency_ms,
                 (error or "")[:500],
+                prompt_tokens,
+                completion_tokens,
+                total_tokens,
                 utc_now_iso(),
             ),
         )
@@ -94,6 +100,9 @@ def invoke_companion_llm(
             latency_ms=latency,
             provider=str(meta.get("provider") or provider),
             model=str(meta.get("model") or model),
+            prompt_tokens=meta.get("prompt_tokens"),
+            completion_tokens=meta.get("completion_tokens"),
+            total_tokens=meta.get("total_tokens"),
         )
         raw["engine"] = "llm"
         return raw, "llm"

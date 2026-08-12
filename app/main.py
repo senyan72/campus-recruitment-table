@@ -30,6 +30,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    from app.envutil import load_dotenv
+
+    load_dotenv()
     from app.config import load_config
 
     cfg = load_config()

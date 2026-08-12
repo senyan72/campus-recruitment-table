@@ -13,7 +13,7 @@ pypdf>=4.0.0
 python-docx>=1.1.0
 
 # AI 陪伴（coach 模式）使用 FastAPI/uvicorn/PyYAML
-# LLM 外接：设置 COACH_LLM_API_KEY + COACH_LLM_PROVIDER（当前为 stub，规则引擎 fallback）
+# LLM：OpenAI 兼容接入 Qwen（DashScope）/ DeepSeek；见 .env.example 与 docs/coach_ai_companion.md
 # OCR 为可选依赖，见 requirements-ocr.txt
 # pip install -r requirements-ocr.txt
 # 并在 config.json 设置 "ocr_enabled": true

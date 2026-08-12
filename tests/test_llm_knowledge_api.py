@@ -35,9 +35,24 @@ def _login(client: TestClient) -> dict[str, str]:
 def test_resolve_qwen_deepseek_presets():
     q = resolve_provider_config(provider="qwen", api_key="k")
     assert "dashscope" in q["base_url"]
-    assert q["model"]
+    assert q["model"] == "qwen-plus"
     d = resolve_provider_config(provider="deepseek", api_key="k")
     assert "deepseek" in d["base_url"]
+    assert d["model"] == "deepseek-v4-flash"
+    # 旧模型名自动迁移
+    legacy = resolve_provider_config(provider="deepseek", api_key="k", model="deepseek-chat")
+    assert legacy["model"] == "deepseek-v4-flash"
+
+
+def test_vendor_key_env_fallback(monkeypatch):
+    monkeypatch.delenv("COACH_LLM_API_KEY", raising=False)
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "sk-dash")
+    q = resolve_provider_config(provider="qwen")
+    assert q["api_key"] == "sk-dash"
+    monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-ds")
+    d = resolve_provider_config(provider="deepseek")
+    assert d["api_key"] == "sk-ds"
 
 
 def test_extract_json_object():
@@ -53,6 +68,9 @@ def test_llm_status_endpoint(client):
     assert "qwen" in body["supported_providers"]
     assert "deepseek" in body["supported_providers"]
     assert body["force_rules"] is True
+    assert "guides" in body
+    assert "qwen" in body["guides"]
+    assert "deepseek" in body["guides"]
 
 
 def test_llm_complete_json_falls_back_without_key(client):

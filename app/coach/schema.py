@@ -157,6 +157,9 @@ CREATE TABLE IF NOT EXISTS llm_call_logs (
   fallback INTEGER NOT NULL,
   latency_ms INTEGER,
   error TEXT,
+  prompt_tokens INTEGER,
+  completion_tokens INTEGER,
+  total_tokens INTEGER,
   created_at TEXT NOT NULL
 );
 """

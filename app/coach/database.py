@@ -28,6 +28,15 @@ class CoachDB:
 
     def migrate(self) -> None:
         self._conn.executescript(SCHEMA_SQL)
+        # 兼容旧库补列
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(llm_call_logs)").fetchall()}
+        for col, typ in (
+            ("prompt_tokens", "INTEGER"),
+            ("completion_tokens", "INTEGER"),
+            ("total_tokens", "INTEGER"),
+        ):
+            if cols and col not in cols:
+                self._conn.execute(f"ALTER TABLE llm_call_logs ADD COLUMN {col} {typ}")
         self._conn.commit()
 
     def close(self) -> None:
