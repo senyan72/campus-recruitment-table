@@ -1,101 +1,153 @@
-# 将 GitHub 上带 AI 陪伴的 Viewer 代码同步到本机 Windows
+# 在校招求职表应用程序目录内拉取/更新 AI 陪伴代码（唯一正式项目目录）
 # 用法（PowerShell）：
 #   powershell -ExecutionPolicy Bypass -File scripts\sync_ai_viewer_to_windows.ps1
-# 或指定旧项目路径（自动复制 .env / config）：
-#   powershell -ExecutionPolicy Bypass -File scripts\sync_ai_viewer_to_windows.ps1 -OldProject "C:\Users\johan\Desktop\coding\校招求职表应用程序最新版"
+# 或指定项目路径：
+#   powershell -ExecutionPolicy Bypass -File scripts\sync_ai_viewer_to_windows.ps1 -ProjectDir "C:\Users\johan\Desktop\coding\校招求职表应用程序"
+#
+# 已废弃、请勿再使用：campus_recruitment、campus-recruitment-table-ai、校招求职表应用程序最新版 等旁路目录。
+# 若 git 连不上 GitHub，请用 scripts\install_ai_into_project.ps1（见 docs\WINDOWS_SYNC_AI.md）。
 
 param(
-    [string]$OldProject = "",
-    [string]$TargetDir = "",
+    [string]$ProjectDir = "",
+    [string]$LegacyDir = "",
     [string]$Branch = "cursor/ai-companion-workflows-7a1d",
     [string]$RepoUrl = "https://github.com/senyan72/campus-recruitment-table.git"
 )
 
 $ErrorActionPreference = "Stop"
+$DefaultProjectName = "校招求职表应用程序"
 
 function Write-Step([string]$Msg) {
     Write-Host ""
     Write-Host "==> $Msg" -ForegroundColor Cyan
 }
 
-if (-not $TargetDir) {
-    $coding = Split-Path -Parent (Get-Location)
-    if ((Split-Path -Leaf (Get-Location)) -eq "scripts") {
-        $coding = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+function Resolve-ProjectDir {
+    param([string]$Hint)
+    if ($Hint) {
+        return $Hint
     }
-    if ($OldProject) {
-        $coding = Split-Path -Parent $OldProject
+    $here = Get-Location
+    $leaf = Split-Path -Leaf $here.Path
+    if ($leaf -eq $DefaultProjectName) {
+        return $here.Path
     }
-    $TargetDir = Join-Path $coding "campus-recruitment-table-ai"
+    if ($leaf -eq "scripts") {
+        $parent = Split-Path -Parent $PSScriptRoot
+        if ((Split-Path -Leaf $parent) -eq $DefaultProjectName) {
+            return $parent
+        }
+        $coding = Split-Path -Parent $parent
+        return Join-Path $coding $DefaultProjectName
+    }
+  $coding = if ($LegacyDir) { Split-Path -Parent $LegacyDir } else { Split-Path -Parent $here.Path }
+    return Join-Path $coding $DefaultProjectName
 }
 
-Write-Step "目标目录: $TargetDir"
+function Copy-LegacyConfig {
+    param(
+        [string]$FromDir,
+        [string]$ToDir
+    )
+    if (-not $FromDir -or -not (Test-Path -LiteralPath $FromDir)) {
+        return
+    }
+    Write-Step "从旧目录迁移配置: $FromDir -> $ToDir"
+    $pairs = @(
+        @(".env", ".env"),
+        @("config.json", "config.json"),
+        @("data\config.json", "data\config.json")
+    )
+    foreach ($pair in $pairs) {
+        $src = Join-Path $FromDir $pair[0]
+        $dst = Join-Path $ToDir $pair[1]
+        if (Test-Path -LiteralPath $src) {
+            $parent = Split-Path $dst -Parent
+            New-Item -ItemType Directory -Force -Path $parent | Out-Null
+            Copy-Item -LiteralPath $src -Destination $dst -Force
+            Write-Host "  已迁移 $($pair[0])"
+        }
+    }
+}
+
+$ProjectDir = Resolve-ProjectDir -Hint $ProjectDir
+Write-Step "正式项目目录: $ProjectDir"
 Write-Step "分支: $Branch"
 
-# 1) 获取代码
-if (Test-Path (Join-Path $TargetDir ".git")) {
-    Set-Location $TargetDir
+if (-not (Test-Path -LiteralPath $ProjectDir)) {
+    New-Item -ItemType Directory -Force -Path $ProjectDir | Out-Null
+    Write-Host "已创建目录: $ProjectDir"
+}
+
+$gitDir = Join-Path $ProjectDir ".git"
+if (Test-Path -LiteralPath $gitDir) {
+    Set-Location $ProjectDir
     git fetch origin
     git checkout $Branch
     git pull origin $Branch
 } else {
-    if (Test-Path $TargetDir) {
-        throw "目录已存在但不是 git 仓库: $TargetDir`n请删除后重试，或指定其他 -TargetDir"
-    }
-    git clone -b $Branch $RepoUrl $TargetDir
-    Set-Location $TargetDir
-}
-
-# 2) 从旧项目复制配置
-if ($OldProject -and (Test-Path -LiteralPath $OldProject)) {
-    Write-Step "从旧项目复制配置: $OldProject"
-    $oldEnv = Join-Path $OldProject ".env"
-    $oldCfg = Join-Path $OldProject "config.json"
-    $oldDataCfg = Join-Path $OldProject "data\config.json"
-    if (Test-Path -LiteralPath $oldEnv) {
-        Copy-Item -LiteralPath $oldEnv -Destination (Join-Path $TargetDir ".env") -Force
-        Write-Host "  已复制 .env"
-    }
-    if (Test-Path -LiteralPath $oldCfg) {
-        Copy-Item -LiteralPath $oldCfg -Destination (Join-Path $TargetDir "config.json") -Force
-        Write-Host "  已复制 config.json"
-    } elseif (Test-Path -LiteralPath $oldDataCfg) {
-        Copy-Item -LiteralPath $oldDataCfg -Destination (Join-Path $TargetDir "data\config.json") -Force
-        Write-Host "  已复制 data\config.json"
-    }
-} else {
-    if (-not (Test-Path (Join-Path $TargetDir ".env"))) {
-        Copy-Item -LiteralPath (Join-Path $TargetDir ".env.example") -Destination (Join-Path $TargetDir ".env") -Force -ErrorAction SilentlyContinue
-        Write-Host "提示: 请编辑 $TargetDir\.env 填入 DASHSCOPE_API_KEY / DEEPSEEK_API_KEY"
+    $hasApp = Test-Path (Join-Path $ProjectDir "app\main.py")
+    if ($hasApp) {
+        Write-Host "目录已有应用代码但不是 git 仓库，跳过 clone（可用 install_ai_into_project.ps1 覆盖更新）" -ForegroundColor Yellow
+    } else {
+        Write-Step "首次克隆到正式目录"
+        git clone -b $Branch $RepoUrl $ProjectDir
+        Set-Location $ProjectDir
     }
 }
 
-# 3) 校验 AI 文件
-$coachViewer = Join-Path $TargetDir "app\ui\coach_viewer.py"
-$viewerPy = Join-Path $TargetDir "app\ui\viewer.py"
+$legacyCandidates = @()
+if ($LegacyDir) { $legacyCandidates += $LegacyDir }
+$legacyCandidates += @(
+    (Join-Path (Split-Path -Parent $ProjectDir) "campus_recruitment"),
+    (Join-Path (Split-Path -Parent $ProjectDir) "campus-recruitment-table-ai"),
+    (Join-Path (Split-Path -Parent $ProjectDir) "校招求职表应用程序最新版")
+)
+foreach ($legacy in $legacyCandidates) {
+    if ($legacy -and (Test-Path -LiteralPath $legacy) -and ($legacy -ne $ProjectDir)) {
+        Copy-LegacyConfig -FromDir $legacy -ToDir $ProjectDir
+        break
+    }
+}
+
+if (-not (Test-Path (Join-Path $ProjectDir ".env"))) {
+    $example = Join-Path $ProjectDir ".env.example"
+    if (Test-Path -LiteralPath $example) {
+        Copy-Item -LiteralPath $example -Destination (Join-Path $ProjectDir ".env") -Force
+        Write-Host "提示: 请编辑 $ProjectDir\.env 填入 DASHSCOPE_API_KEY / DEEPSEEK_API_KEY"
+    }
+}
+
+$coachViewer = Join-Path $ProjectDir "app\ui\coach_viewer.py"
+$viewerPy = Join-Path $ProjectDir "app\ui\viewer.py"
 if (-not (Test-Path -LiteralPath $coachViewer)) {
-    throw "同步后仍缺少 app\ui\coach_viewer.py，请检查分支 $Branch"
+    throw @"
+缺少 app\ui\coach_viewer.py。
+若 git clone 失败，请改用浏览器下载 ZIP 后执行：
+  powershell -ExecutionPolicy Bypass -File scripts\install_ai_into_project.ps1 -Target `"$ProjectDir`"
+详见 docs\WINDOWS_SYNC_AI.md
+"@
 }
 $hit = Select-String -Path $viewerPy -Pattern "AI 陪伴" -SimpleMatch -Quiet
 if (-not $hit) {
-    throw "app\ui\viewer.py 未包含 AI 陪伴页签，分支可能不对"
+    throw "app\ui\viewer.py 未包含 AI 陪伴页签，请确认分支 $Branch 或使用 install_ai_into_project.ps1"
 }
 Write-Host "  OK: coach_viewer.py 与 viewer AI 页签已就绪" -ForegroundColor Green
 
-# 4) 安装依赖
 Write-Step "安装 Python 依赖"
-if (-not (Test-Path (Join-Path $TargetDir ".venv"))) {
-    python -m venv .venv
+$venvDir = Join-Path $ProjectDir "venv"
+if (-not (Test-Path $venvDir)) {
+    python -m venv $venvDir
 }
-& (Join-Path $TargetDir ".venv\Scripts\python.exe") -m pip install -U pip
-& (Join-Path $TargetDir ".venv\Scripts\pip.exe") install -r (Join-Path $TargetDir "requirements.txt")
+& (Join-Path $venvDir "Scripts\python.exe") -m pip install -U pip
+& (Join-Path $venvDir "Scripts\pip.exe") install -r (Join-Path $ProjectDir "requirements.txt")
 
 Write-Step "完成"
 Write-Host @"
 
-下一步：
-  cd `"$TargetDir`"
-  .\.venv\Scripts\Activate.ps1
+下一步（均在正式目录内操作）：
+  cd `"$ProjectDir`"
+  .\venv\Scripts\Activate.ps1
   python -m app.main --mode viewer
 
 登录后顶部应看到页签：岗位投递 | AI 陪伴

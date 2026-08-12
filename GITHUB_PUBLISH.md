@@ -5,7 +5,7 @@
 ## 1. 发布前检查
 
 ```powershell
-cd "校招求职表应用程序最新版"
+cd "校招求职表应用程序"
 git status --short
 rg -n -i "service_role|eyJ[a-zA-Z0-9_-]{20,}|\.supabase\.co|C:\\\\Users\\\\" --glob '!dist/**' --glob '!build/**'
 ```
