@@ -1,0 +1,54 @@
+:root {
+  --bg: #f4f7fb;
+  --ink: #1c2430;
+  --muted: #5c6b7a;
+  --primary: #1f6feb;
+  --card: #ffffff;
+  --line: #d8e0ea;
+  --danger: #b42318;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
+  background: radial-gradient(1200px 500px at 10% -10%, #dce9ff, transparent), var(--bg);
+  color: var(--ink);
+}
+.top { padding: 20px 16px 8px; }
+.brand { font-size: 1.6rem; font-weight: 700; letter-spacing: 0.02em; }
+.sub { margin: 6px 0 0; color: var(--muted); font-size: 0.9rem; }
+.tabs {
+  display: flex; gap: 6px; padding: 8px 12px; overflow-x: auto;
+  border-bottom: 1px solid var(--line); background: rgba(255,255,255,0.7);
+}
+.tabs button {
+  border: 0; background: transparent; padding: 8px 12px; border-radius: 8px;
+  color: var(--muted); cursor: pointer;
+}
+.tabs button.active { background: #e8f0fe; color: var(--primary); font-weight: 600; }
+main { padding: 16px; max-width: 720px; margin: 0 auto; }
+.panel {
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px; margin-bottom: 12px;
+}
+label { display: block; font-size: 0.85rem; color: var(--muted); margin: 8px 0 4px; }
+input, textarea, select {
+  width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 10px;
+  font: inherit; background: #fff;
+}
+textarea { min-height: 120px; }
+.btn {
+  display: inline-block; margin-top: 10px; margin-right: 8px; padding: 10px 14px;
+  border-radius: 10px; border: 0; background: var(--primary); color: #fff; cursor: pointer;
+}
+.btn.soft { background: #e8f0fe; color: var(--primary); }
+.btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.muted { color: var(--muted); font-size: 0.9rem; }
+.error { color: var(--danger); white-space: pre-wrap; }
+pre {
+  white-space: pre-wrap; background: #f7fafc; border-radius: 10px; padding: 10px;
+  border: 1px solid var(--line); font-size: 0.85rem;
+}
+.list item, .chip {
+  display: block; padding: 8px 0; border-bottom: 1px dashed var(--line);
+}

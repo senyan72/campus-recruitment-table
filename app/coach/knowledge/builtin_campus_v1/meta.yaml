@@ -1,0 +1,6 @@
+version: builtin_campus_v1
+audience: campus_graduate
+locale: zh-CN
+disclaimer: 内置默认知识包，仅供 AI 陪伴练习；不构成人事决策或录用建议。
+tracks:
+  - campus_general

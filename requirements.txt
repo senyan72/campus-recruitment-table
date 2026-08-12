@@ -5,7 +5,12 @@ lxml>=5.0.0
 openpyxl>=3.1.0
 pytest>=8.0.0
 pyinstaller>=6.0.0
+fastapi>=0.110.0
+uvicorn>=0.27.0
+PyYAML>=6.0
 
+# AI 陪伴（coach 模式）使用 FastAPI/uvicorn/PyYAML
+# LLM 外接：设置 COACH_LLM_API_KEY + COACH_LLM_PROVIDER（当前为 stub，规则引擎 fallback）
 # OCR 为可选依赖，见 requirements-ocr.txt
 # pip install -r requirements-ocr.txt
 # 并在 config.json 设置 "ocr_enabled": true
