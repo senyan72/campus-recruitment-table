@@ -133,4 +133,15 @@ def try_llm_match(
     raw.pop("_meta", None)
     if raw.get("tier") not in MATCH_TIERS:
         return None, "rules"
+    # LLM 偶发把列表字段写成字符串，这里规范化
+    for key in ("why_apply", "why_not", "reasons", "gaps"):
+        val = raw.get(key)
+        if isinstance(val, str):
+            raw[key] = [val] if val.strip() else []
+        elif val is None:
+            raw[key] = []
+    if not isinstance(raw.get("requirement_evidence_table"), list):
+        raw["requirement_evidence_table"] = []
+    if not isinstance(raw.get("gap_mitigations"), list):
+        raw["gap_mitigations"] = []
     return ensure_disclaimer(raw), engine

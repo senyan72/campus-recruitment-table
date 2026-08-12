@@ -29,11 +29,10 @@ function el(html) {
   return d.firstChild;
 }
 
-function esc(s) {
-  return String(s || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+function asList(v) {
+  if (Array.isArray(v)) return v;
+  if (v == null || v === "") return [];
+  return [String(v)];
 }
 
 function tierClass(tier) {
