@@ -8,11 +8,22 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$Target,
-    [string]$Source = (Join-Path $PSScriptRoot ".."),
+    [string]$Source = "",
     [string]$LegacyDir = ""
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not $Source) {
+    $scriptDir = $PSScriptRoot
+    if (-not $scriptDir) {
+        $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    }
+    if (-not $scriptDir) {
+        throw "Cannot resolve script directory. Pass -Source explicitly."
+    }
+    $Source = Join-Path $scriptDir ".."
+}
 
 $Source = (Resolve-Path $Source).Path
 if (-not (Test-Path -LiteralPath $Target)) {
