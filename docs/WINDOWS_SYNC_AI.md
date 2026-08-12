@@ -21,14 +21,17 @@
 1. 用浏览器打开（可挂代理/VPN）：
    - https://github.com/senyan72/campus-recruitment-table/archive/refs/heads/cursor/ai-companion-workflows-7a1d.zip
 2. 解压到**临时目录**（任意英文名，例如 `C:\Users\johan\Desktop\coding\_zip_tmp`）
-3. 进入解压后的文件夹，执行（**-Target 必填**，路径用你本机正式项目目录）：
+3. 进入解压后的文件夹，执行（**-Target 必填**；若正式目录是空的，加 **-LegacyDir** 指向你原来完整的旧项目，例如 `校招求职表应用程序最新版`）：
 
 ```powershell
 cd "C:\Users\johan\Desktop\coding\校招求职表应用程序最新版\campus-recruitment-table-cursor-ai-companion-workflows-7a1d"
-powershell -ExecutionPolicy Bypass -File ".\scripts\install_ai_into_project.ps1" -Target "C:\Users\johan\Desktop\coding\校招求职表应用程序"
+powershell -ExecutionPolicy Bypass -File ".\scripts\install_ai_into_project.ps1" `
+  -Target "C:\Users\johan\Desktop\coding\校招求职表应用程序" `
+  -LegacyDir "C:\Users\johan\Desktop\coding\校招求职表应用程序最新版" `
+  -Source "C:\Users\johan\Desktop\coding\校招求职表应用程序最新版\campus-recruitment-table-cursor-ai-companion-workflows-7a1d"
 ```
 
-> **说明**：`.ps1` 脚本源码为纯英文（ASCII），避免 Windows PowerShell 5 中文乱码导致语法错误。中文路径通过命令行 `-Target` 传入即可。
+> **说明**：`.ps1` 脚本源码为纯英文（ASCII），避免 Windows PowerShell 5 中文乱码。若曾出现 `No module named 'app.config'`，说明正式目录只有 AI 文件、缺少完整 `app/`，必须用 `-LegacyDir` 从旧项目补全，或重新跑一遍更新后的安装脚本。
 
 4. 在正式目录启动：
 
