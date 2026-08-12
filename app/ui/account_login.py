@@ -124,6 +124,18 @@ class LoginDialog(ctk.CTkToplevel):
         self.account_entry.bind("<Return>", lambda _e: self.password_entry.focus_set())
         self.password_entry.bind("<Return>", lambda _e: self._login())
         self.after(100, self.account_entry.focus_set)
+        # Fix for CTkToplevel visibility issue with withdrawn master
+        self.after(200, self._fix_visibility)
+
+    def _fix_visibility(self) -> None:
+        """Force dialog to be visible."""
+        try:
+            self.deiconify()
+            self.lift()
+            self.focus_force()
+            self.update()
+        except Exception:
+            pass
 
     def _cancel(self) -> None:
         self.logged_in_account = None
