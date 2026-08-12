@@ -44,8 +44,23 @@ python -m app.main --mode coach --host 127.0.0.1 --port 8787
 | PUT | `/v1/knowledge/interview/{track}` | 写入/合并题库（可选 `X-Coach-Admin-Token`） |
 | PUT | `/v1/knowledge/hr/{topic}` | 写入人事短文 |
 | PUT | `/v1/knowledge/meta` | 更新用户包 meta |
+| GET | `/v1/knowledge/documents` | 已上传文档列表 |
+| POST | `/v1/knowledge/documents/upload` | 上传 PDF/DOCX/MD/TXT（解析+切片） |
+| GET | `/v1/knowledge/documents/search?q=` | 检索文档切片 |
+| GET | `/v1/jobs` | 校招表岗位库（薄集成） |
+| GET | `/v1/jobs/{job_id}` | 单岗位详情 |
 
 生产环境请设置 `COACH_ADMIN_TOKEN`，写入接口需带请求头 `X-Coach-Admin-Token`。
+
+## 文档知识库（选项 3）
+
+支持上传任意 `PDF / DOCX / MD / TXT`，服务端解析文本后按标题切片存入 SQLite，供 `build_companion_context` 与 `/v1/knowledge/context` 检索注入 LLM。
+
+```powershell
+pip install pypdf python-docx python-multipart
+```
+
+上传后可在 H5「我的」页管理，或通过 API `POST /v1/knowledge/documents/upload`（multipart `file` 字段）。
 
 ## LLM 外接（可直接接入）
 

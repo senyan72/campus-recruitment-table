@@ -8,6 +8,7 @@ from app.coach.ai.resume_suggest import (
     apply_approved_suggestions,
     diff_versions,
     generate_suggestions,
+    try_llm_suggestions,
     wrap_suggest_result,
 )
 from app.coach.database import CoachDB
@@ -85,12 +86,23 @@ def _suggest(payload: dict[str, Any], context: dict[str, Any] | None, *, scenari
     db: CoachDB = (context or {})["db"]
     version = _load_version(db, payload["version_id"])
     facts = db.list_confirmed_facts(payload["user_id"])
-    suggestions = generate_suggestions(
+    llm_suggestions, engine = try_llm_suggestions(
+        db,
+        user_id=payload["user_id"],
         sections=version["sections"],
         job=payload.get("job"),
-        facts=facts,
         scenario=scenario,
     )
+    if llm_suggestions is not None:
+        suggestions = llm_suggestions
+    else:
+        suggestions = generate_suggestions(
+            sections=version["sections"],
+            job=payload.get("job"),
+            facts=facts,
+            scenario=scenario,
+        )
+        engine = "rules"
     sid = db.new_id("rsg_")
     db.execute(
         "INSERT INTO resume_suggestions(id, version_id, user_id, scenario, payload_json, created_at) VALUES(?,?,?,?,?,?)",
@@ -98,6 +110,7 @@ def _suggest(payload: dict[str, Any], context: dict[str, Any] | None, *, scenari
     )
     result = wrap_suggest_result(suggestions, scenario)
     result["suggestion_set_id"] = sid
+    result["engine"] = engine
     return result
 
 

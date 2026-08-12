@@ -135,3 +135,50 @@ def diff_versions(before: dict[str, Any], after: dict[str, Any]) -> list[dict[st
 
 def wrap_suggest_result(suggestions: list[dict[str, Any]], scenario: str) -> dict[str, Any]:
     return ensure_disclaimer({"scenario": scenario, "suggestions": suggestions})
+
+
+_RESUME_LLM_SYSTEM = """你是校招简历教练。仅依据 companion_context 中 confirmed_facts 与 knowledge 给建议。
+禁止编造实习/项目/数字/证书。无证据时 needs_proof=true。
+输出 JSON：{"suggestions":[{"id":"sug_1","section":"经历","before_text":"原文片段","suggestion":"改写建议","reason":"原因","fact_ids":["fact_id"],"needs_proof":false,"scenario":"场景名"}]}
+不要 Markdown 围栏，不要录用概率话术。"""
+
+
+def try_llm_suggestions(
+    db: Any,
+    *,
+    user_id: str,
+    sections: dict[str, Any] | str,
+    job: dict[str, Any] | None,
+    scenario: str,
+) -> tuple[list[dict[str, Any]] | None, str]:
+    from app.coach.ai.llm_invoke import invoke_companion_llm
+
+    if isinstance(sections, dict):
+        blob = "\n".join(f"## {k}\n{v}" for k, v in sections.items())
+    else:
+        blob = str(sections or "")
+    job_title = str((job or {}).get("title") or (job or {}).get("job_title") or "目标岗位")
+    extra = (
+        f"场景: {scenario}\n目标岗位: {job_title}\n"
+        f"简历内容:\n{blob[:6000]}\n"
+        f"请输出 1-5 条 suggestions，scenario 字段填 {scenario!r}。"
+    )
+    raw, engine = invoke_companion_llm(
+        db,
+        user_id=user_id,
+        task=f"resume.suggest.{scenario}",
+        schema_name="resume_suggestions",
+        system=_RESUME_LLM_SYSTEM,
+        user_extra=extra,
+        query=job_title,
+        job=job,
+        validator="resume_suggestions",
+    )
+    if raw is None:
+        return None, engine
+    suggestions = raw.get("suggestions") or []
+    if not isinstance(suggestions, list):
+        return None, "rules"
+    confirmed_ids = {str(f["id"]) for f in db.list_confirmed_facts(user_id)}
+    cleaned = assert_suggestions_safe(suggestions, confirmed_fact_ids=confirmed_ids)
+    return cleaned, engine

@@ -121,4 +121,42 @@ CREATE TABLE IF NOT EXISTS sessions (
   token TEXT NOT NULL UNIQUE,
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS knowledge_documents (
+  id TEXT PRIMARY KEY,
+  owner_id TEXT,
+  filename TEXT NOT NULL,
+  content_type TEXT,
+  tags_json TEXT NOT NULL DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT 'ready',
+  sha256 TEXT,
+  byte_size INTEGER,
+  meta_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS knowledge_chunks (
+  id TEXT PRIMARY KEY,
+  document_id TEXT NOT NULL REFERENCES knowledge_documents(id),
+  chunk_index INTEGER NOT NULL,
+  heading TEXT,
+  text TEXT NOT NULL,
+  meta_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_doc ON knowledge_chunks(document_id);
+
+CREATE TABLE IF NOT EXISTS llm_call_logs (
+  id TEXT PRIMARY KEY,
+  task TEXT NOT NULL,
+  schema_name TEXT,
+  provider TEXT,
+  model TEXT,
+  ok INTEGER NOT NULL,
+  fallback INTEGER NOT NULL,
+  latency_ms INTEGER,
+  error TEXT,
+  created_at TEXT NOT NULL
+);
 """

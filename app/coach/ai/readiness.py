@@ -60,3 +60,38 @@ def assess_readiness(
         "confidence_reason": "基于已确认事实与问卷作文本阶段判断，非能力总分",
     }
     return ensure_disclaimer(report)
+
+
+_READINESS_LLM_SYSTEM = """你是校招准备度陪伴助手。仅依据 companion_context 中 confirmed_facts 与问卷回答判断阶段。
+禁止能力总分与录用概率。stage 只能是：探索期、准备期、投递期、面试期、收束期、信息不足。
+输出 JSON：stage、strengths、blockers、missing_info、weekly_focus、citations、confidence、confidence_reason。
+不要 Markdown 围栏。"""
+
+
+def try_llm_readiness(
+    db: Any,
+    *,
+    user_id: str,
+    answers: dict[str, Any],
+) -> tuple[dict[str, Any] | None, str]:
+    from app.coach.ai.llm_invoke import invoke_companion_llm
+
+    import json
+
+    extra = f"问卷回答:\n{json.dumps(answers, ensure_ascii=False)}\n请输出 readiness 报告 JSON。"
+    raw, engine = invoke_companion_llm(
+        db,
+        user_id=user_id,
+        task="readiness.assess",
+        schema_name="readiness_report",
+        system=_READINESS_LLM_SYSTEM,
+        user_extra=extra,
+        validator="readiness_report",
+    )
+    if raw is None:
+        return None, engine
+    raw.pop("engine", None)
+    raw.pop("_meta", None)
+    if raw.get("stage") and raw.get("stage") not in READINESS_STAGES:
+        return None, "rules"
+    return ensure_disclaimer(raw), engine

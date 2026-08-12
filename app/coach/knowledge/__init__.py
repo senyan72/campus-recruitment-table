@@ -10,6 +10,11 @@ from typing import Any
 import yaml
 
 from app.config import app_data_dir, project_root
+from app.coach.knowledge.documents import (  # noqa: F401
+    ingest_document,
+    list_documents,
+    search_document_chunks,
+)
 
 _SAFE_NAME = re.compile(r"^[a-zA-Z0-9_\-]{1,64}$")
 
@@ -223,9 +228,20 @@ def build_llm_knowledge_context(
     track: str = "campus_general",
     stage: str | None = None,
     query: str | None = None,
+    include_documents: bool = True,
+    db: Any | None = None,
+    owner_id: str | None = None,
 ) -> dict[str, Any]:
     """给 LLM 用的知识库上下文块。"""
     ctx = knowledge_context_for_interview(track=track, stage=stage)
     if query:
         ctx["search_hits"] = search_knowledge(query=query, limit=8)
+        if include_documents and db is not None:
+            from app.coach.knowledge.documents import search_document_chunks
+
+            ctx["document_hits"] = search_document_chunks(
+                db, query=query, limit=6, owner_id=owner_id
+            )
+    elif include_documents and db is not None:
+        ctx["document_hits"] = []
     return ctx

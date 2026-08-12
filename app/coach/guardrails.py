@@ -77,3 +77,47 @@ def filter_approved_only(suggestions: list[dict[str, Any]]) -> list[dict[str, An
             continue
         out.append(s)
     return out
+
+
+def validate_llm_payload(
+    raw: dict[str, Any],
+    *,
+    validator: str,
+    confirmed_fact_ids: set[str],
+) -> None:
+    """LLM 输出校验；失败抛 ValueError，由调用方回退规则引擎。"""
+    if not isinstance(raw, dict):
+        raise ValueError("LLM 输出必须是 JSON 对象")
+
+    if validator == "resume_suggestions":
+        suggestions = raw.get("suggestions")
+        if not isinstance(suggestions, list):
+            raise ValueError("suggestions 必须是数组")
+        for item in suggestions:
+            if not isinstance(item, dict):
+                raise ValueError("suggestion 项必须是对象")
+            sanitize_suggestion(item, confirmed_fact_ids=confirmed_fact_ids)
+        return
+
+    if validator == "match_explain":
+        tier = raw.get("tier")
+        if tier is not None and tier not in MATCH_TIERS:
+            raise ValueError(f"无效 tier: {tier}")
+        reject_hire_probability_language(str(raw))
+        table = raw.get("requirement_evidence_table")
+        if table is not None and not isinstance(table, list):
+            raise ValueError("requirement_evidence_table 必须是数组")
+        return
+
+    if validator == "readiness_report":
+        stage = raw.get("stage")
+        if stage is not None and stage not in READINESS_STAGES:
+            raise ValueError(f"无效 stage: {stage}")
+        reject_hire_probability_language(str(raw))
+        return
+
+    reject_hire_probability_language(str(raw))
+
+
+# 延迟导入避免循环依赖
+from app.coach.models import MATCH_TIERS, READINESS_STAGES  # noqa: E402

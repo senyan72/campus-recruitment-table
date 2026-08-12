@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.coach.ai.readiness import assess_readiness
+from app.coach.ai.readiness import assess_readiness, try_llm_readiness
 from app.coach.database import CoachDB
 from app.coach.workflows.base import WorkflowRegistry, make_workflow
 from app.timeutil import utc_now_iso
@@ -49,7 +49,14 @@ def _assess(payload: dict[str, Any], context: dict[str, Any] | None) -> dict[str
     db: CoachDB = (context or {})["db"]
     user_id = payload["user_id"]
     facts = db.list_confirmed_facts(user_id)
-    report = assess_readiness(answers=payload.get("answers") or {}, facts=facts)
+    answers = payload.get("answers") or {}
+    llm_report, engine = try_llm_readiness(db, user_id=user_id, answers=answers)
+    if llm_report is not None:
+        report = llm_report
+    else:
+        report = assess_readiness(answers=answers, facts=facts)
+        engine = "rules"
+    report["engine"] = engine
     version = 1
     last = db.fetchone(
         "SELECT version FROM readiness_assessments WHERE user_id=? ORDER BY version DESC LIMIT 1",

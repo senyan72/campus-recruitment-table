@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.coach.ai.matching import match_job
+from app.coach.ai.matching import match_job, try_llm_match
 from app.coach.database import CoachDB
+from app.coach.services.jobs_bridge import get_job_for_match
 from app.coach.workflows.base import WorkflowRegistry, make_workflow
 from app.timeutil import utc_now_iso
 
@@ -31,13 +32,24 @@ def _explain(payload: dict[str, Any], context: dict[str, Any] | None) -> dict[st
     db: CoachDB = (context or {})["db"]
     user_id = payload["user_id"]
     job = payload.get("job") or {}
+    if not job.get("description") and payload.get("job_id"):
+        campus_path = (context or {}).get("campus_db_path")
+        loaded = get_job_for_match(job_id=str(payload["job_id"]), campus_db_path=campus_path)
+        if loaded:
+            job = {**loaded, **job}
     facts = db.list_confirmed_facts(user_id)
     strengths_row = db.fetchone(
         "SELECT payload_json FROM strengths WHERE user_id=? ORDER BY created_at DESC LIMIT 1",
         (user_id,),
     )
     strengths = db.loads(strengths_row["payload_json"], []) if strengths_row else []
-    result = match_job(job=job, facts=facts, strengths=strengths)
+    llm_result, engine = try_llm_match(db, user_id=user_id, job=job)
+    if llm_result is not None:
+        result = llm_result
+    else:
+        result = match_job(job=job, facts=facts, strengths=strengths)
+        engine = "rules"
+    result["engine"] = engine
     mid = db.new_id("match_")
     db.execute(
         "INSERT INTO job_matches(id, user_id, job_id, job_json, result_json, created_at) VALUES(?,?,?,?,?,?)",

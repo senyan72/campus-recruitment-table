@@ -96,3 +96,41 @@ def match_job(
         "version": "v1-rules",
     }
     return ensure_disclaimer(result)
+
+
+_MATCH_LLM_SYSTEM = """你是校招岗位匹配顾问。仅依据 companion_context 中 confirmed_facts 与 JD 做四档判断。
+禁止录用概率与保证 Offer。输出 JSON 含字段：
+tier(优先投|可以投|补充后投|暂不建议)、reasons、gaps、cost(低|中|高)、next_action、
+requirement_evidence_table([{requirement,evidence,status:matched|gap}])、why_apply、why_not、gap_mitigations。
+不要 Markdown 围栏。"""
+
+
+def try_llm_match(
+    db: Any,
+    *,
+    user_id: str,
+    job: dict[str, Any],
+) -> tuple[dict[str, Any] | None, str]:
+    from app.coach.ai.llm_invoke import invoke_companion_llm
+
+    title = str(job.get("title") or job.get("job_title") or "")
+    jd = str(job.get("description") or job.get("jd") or title)
+    extra = f"岗位: {title}\nJD:\n{jd[:5000]}\n请输出 match.explain 结构 JSON。"
+    raw, engine = invoke_companion_llm(
+        db,
+        user_id=user_id,
+        task="match.explain",
+        schema_name="match_explain",
+        system=_MATCH_LLM_SYSTEM,
+        user_extra=extra,
+        query=title,
+        job=job,
+        validator="match_explain",
+    )
+    if raw is None:
+        return None, engine
+    raw.pop("engine", None)
+    raw.pop("_meta", None)
+    if raw.get("tier") not in MATCH_TIERS:
+        return None, "rules"
+    return ensure_disclaimer(raw), engine
