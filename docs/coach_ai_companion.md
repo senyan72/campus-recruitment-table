@@ -8,8 +8,27 @@
 
 ## 启动
 
+### 推荐：Viewer 桌面端（岗位表 + AI 陪伴）
+
 ```powershell
 pip install -r requirements.txt
+# 根目录配置 .env（Qwen/DeepSeek Key，见下文）
+python -m app.main --mode viewer
+```
+
+登录后切换顶部页签：
+
+| 页签 | 能力（对齐 PRD P0） |
+|---|---|
+| **岗位投递** | 原 Viewer：筛选/同步/投递进度；可「AI 匹配选中岗」跳转 |
+| **AI 陪伴** | 今日 → 简历与证据 → 岗位匹配 → 面试陪伴 |
+
+AI 陪伴主链：提取证据 → 确认事实 → 简历多场景建议 → 匹配解释（可引用当前选中岗位）→ 故事库/模拟面试。  
+人工 coach 入口不做。LLM 未配置时自动规则引擎 fallback。
+
+### 可选：独立 H5
+
+```powershell
 $env:COACH_FORCE_RULES="1"
 python -m app.main --mode coach --host 127.0.0.1 --port 8787
 ```
@@ -17,6 +36,7 @@ python -m app.main --mode coach --host 127.0.0.1 --port 8787
 - H5：http://127.0.0.1:8787/coach  
 - 健康检查：`GET /v1/health`  
 - Workflow 列表：`GET /v1/workflows`
+
 
 ## Workflows（P0）
 

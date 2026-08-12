@@ -295,7 +295,7 @@ function matchPanel() {
         body: { payload },
       });
       const r = data.result || {};
-      const table = (r.requirement_evidence_table || [])
+      const table = asList(r.requirement_evidence_table)
         .map(
           (row) => `<tr class="${row.status === "matched" ? "ok" : "gap"}">
           <td>${esc(row.requirement)}</td>
@@ -308,8 +308,8 @@ function matchPanel() {
         <div class="tier ${tierClass(r.tier)}">${esc(r.tier)}</div>
         <p class="muted">引擎：${esc(r.engine || "rules")} · 下一步：${esc(r.next_action || "")}</p>
         <div class="cols">
-          <div><h4>为什么值得投</h4><ul>${(r.why_apply || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>
-          <div><h4>需要注意</h4><ul>${(r.why_not || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>
+          <div><h4>为什么值得投</h4><ul>${asList(r.why_apply).map((x) => `<li>${esc(typeof x === "string" ? x : JSON.stringify(x))}</li>`).join("")}</ul></div>
+          <div><h4>需要注意</h4><ul>${asList(r.why_not).map((x) => `<li>${esc(typeof x === "string" ? x : JSON.stringify(x))}</li>`).join("")}</ul></div>
         </div>
         <table class="ev-table"><thead><tr><th>要求</th><th>证据</th><th>状态</th></tr></thead><tbody>${table}</tbody></table>`;
     } catch (e) {

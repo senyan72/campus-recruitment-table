@@ -11,6 +11,9 @@
 - **Viewer**：查看岗位、筛选、打开原始链接、维护本机投递进度和导出 CSV。
 - **Admin**：导入种子表、探测招聘来源、采集岗位、审核并发布到云端、管理 Viewer 账号。
 - **AI 陪伴（coach）**：证据链、准备度、岗位匹配解释、简历多场景建议、文字模拟面试；**不含人工教练**。详见 [`docs/coach_ai_companion.md`](docs/coach_ai_companion.md)。
+  - **推荐入口（桌面 Viewer）**：`python -m app.main --mode viewer` → 顶部页签 **「AI 陪伴」**
+  - 可选独立 H5：`python -m app.main --mode coach` → http://127.0.0.1:8787/coach
+
 - **深度采集限额**：启动深度采集时可输入本次最多处理的企业数，默认 20 家；可分批运行，减少卡顿。
 - **本地优先**：没有云端配置时仍可使用本地 SQLite；个人投递记录默认不会上传。
 
