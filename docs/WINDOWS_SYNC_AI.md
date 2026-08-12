@@ -21,12 +21,14 @@
 1. 用浏览器打开（可挂代理/VPN）：
    - https://github.com/senyan72/campus-recruitment-table/archive/refs/heads/cursor/ai-companion-workflows-7a1d.zip
 2. 解压到**临时目录**（任意英文名，例如 `C:\Users\johan\Desktop\coding\_zip_tmp`）
-3. 进入解压后的文件夹，执行（`-Target` 可省略，默认写入正式目录）：
+3. 进入解压后的文件夹，执行（**-Target 必填**，路径用你本机正式项目目录）：
 
 ```powershell
-cd "C:\Users\johan\Desktop\coding\_zip_tmp\campus-recruitment-table-cursor-ai-companion-workflows-7a1d"
-powershell -ExecutionPolicy Bypass -File scripts\install_ai_into_project.ps1 -Target "C:\Users\johan\Desktop\coding\校招求职表应用程序"
+cd "C:\Users\johan\Desktop\coding\校招求职表应用程序最新版\campus-recruitment-table-cursor-ai-companion-workflows-7a1d"
+powershell -ExecutionPolicy Bypass -File ".\scripts\install_ai_into_project.ps1" -Target "C:\Users\johan\Desktop\coding\校招求职表应用程序"
 ```
+
+> **说明**：`.ps1` 脚本源码为纯英文（ASCII），避免 Windows PowerShell 5 中文乱码导致语法错误。中文路径通过命令行 `-Target` 传入即可。
 
 4. 在正式目录启动：
 
