@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.coach.ai import get_model_adapter, try_complete_json_or_none
-from app.coach.ai.llm_client import llm_status
+from app.coach.ai.llm_client import llm_status, ping_provider, resolve_dual_routing
 from app.coach.database import CoachDB
 from app.coach.knowledge import (
     build_llm_knowledge_context,
@@ -126,6 +126,40 @@ def create_coach_app(*, db_path: str | None = None, campus_db_path: str | None =
         status = llm_status()
         status["adapter"] = getattr(get_model_adapter(), "model_version", "unknown")
         return status
+
+    @app.post("/v1/llm/ping")
+    def llm_ping(
+        user: dict[str, Any] = Depends(current_user),
+    ) -> dict[str, Any]:
+        """探测已配置的 Qwen / DeepSeek 是否可调用（会各发一次极小请求，产生微量费用）。"""
+        del user
+        dual = resolve_dual_routing()
+        status = llm_status()
+        targets: list[str] = []
+        if status["primary"].get("api_key_configured") and status["primary"].get("provider"):
+            targets.append(status["primary"]["provider"])
+        if status.get("fallback") and status["fallback"].get("api_key_configured"):
+            targets.append(status["fallback"]["provider"])
+        # dual 下确保两家都测
+        if dual.get("has_qwen_key") and "qwen" not in targets and "dashscope" not in targets:
+            targets.append("qwen")
+        if dual.get("has_deepseek_key") and "deepseek" not in targets:
+            targets.append("deepseek")
+        # 去重保序
+        seen: set[str] = set()
+        ordered: list[str] = []
+        for t in targets:
+            if t and t not in seen:
+                seen.add(t)
+                ordered.append(t)
+        results = [ping_provider(p) for p in ordered]
+        return {
+            "dual": dual,
+            "force_rules": status["force_rules"],
+            "ready": status["ready"],
+            "results": results,
+            "all_ok": bool(results) and all(r.get("ok") for r in results),
+        }
 
     @app.post("/v1/llm/complete-json")
     def llm_complete_json(

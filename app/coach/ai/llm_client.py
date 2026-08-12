@@ -101,32 +101,8 @@ EVIDENCE_SYSTEM_PREFIX = """你是校招 AI 求职陪伴助手。必须遵守：
 """
 
 
-def _resolve_api_key(*, provider: str, api_key: str | None, preset: dict[str, str]) -> str:
-    if api_key is not None and str(api_key).strip():
-        return str(api_key).strip()
-    primary = (os.environ.get("COACH_LLM_API_KEY") or "").strip()
-    if primary:
-        return primary
-    key_env = (preset.get("key_env") or "").strip()
-    if key_env:
-        return (os.environ.get(key_env) or "").strip()
-    # 常见别名兜底
-    if provider in {"qwen", "dashscope", "qwen_max"}:
-        return (os.environ.get("DASHSCOPE_API_KEY") or "").strip()
-    if provider in {"deepseek", "deepseek_pro"}:
-        return (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
-    return ""
-
-
-def resolve_provider_config(
-    *,
-    provider: str | None = None,
-    api_key: str | None = None,
-    base_url: str | None = None,
-    model: str | None = None,
-) -> dict[str, str]:
-    prov = (provider or os.environ.get("COACH_LLM_PROVIDER") or "").strip().lower()
-    # 兼容别名
+def _normalize_provider(name: str) -> str:
+    prov = (name or "").strip().lower()
     aliases = {
         "通义": "qwen",
         "千问": "qwen",
@@ -137,11 +113,59 @@ def resolve_provider_config(
         "deepseek-chat": "deepseek",
         "deepseek-reasoner": "deepseek_pro",
     }
-    prov = aliases.get(prov, prov)
+    return aliases.get(prov, prov)
+
+
+def _vendor_key_for(provider: str) -> str:
+    if provider in {"qwen", "dashscope", "qwen_max"}:
+        return (os.environ.get("DASHSCOPE_API_KEY") or "").strip()
+    if provider in {"deepseek", "deepseek_pro"}:
+        return (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
+    if provider == "openai":
+        return (os.environ.get("OPENAI_API_KEY") or "").strip()
+    return ""
+
+
+def _resolve_api_key(*, provider: str, api_key: str | None, preset: dict[str, str]) -> str:
+    """解析 Key：显式参数 > 厂商专用变量 > COACH_LLM_API_KEY（仅当 provider 匹配主 provider）。"""
+    if api_key is not None and str(api_key).strip():
+        return str(api_key).strip()
+    vendor = _vendor_key_for(provider)
+    if vendor:
+        return vendor
+    key_env = (preset.get("key_env") or "").strip()
+    if key_env:
+        v = (os.environ.get(key_env) or "").strip()
+        if v:
+            return v
+    # 通用 Key：仅当未设厂商专用、且当前就是主 provider（或未指定主 provider）时使用
+    shared = (os.environ.get("COACH_LLM_API_KEY") or "").strip()
+    if not shared:
+        return ""
+    main_prov = _normalize_provider(os.environ.get("COACH_LLM_PROVIDER") or "")
+    if not main_prov or main_prov == provider:
+        return shared
+    return ""
+
+
+def resolve_provider_config(
+    *,
+    provider: str | None = None,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    model: str | None = None,
+) -> dict[str, str]:
+    dual = resolve_dual_routing()
+    default_prov = dual["primary_provider"] if dual["enabled"] else (os.environ.get("COACH_LLM_PROVIDER") or "")
+    prov = _normalize_provider(provider or default_prov)
     preset = PROVIDER_PRESETS.get(prov, {})
     key = _resolve_api_key(provider=prov, api_key=api_key, preset=preset)
     url = (base_url if base_url is not None else os.environ.get("COACH_LLM_BASE_URL") or "").strip()
     mdl = (model if model is not None else os.environ.get("COACH_LLM_MODEL") or "").strip()
+    # dual 模式下，备用链路不要吃主链路的 MODEL/BASE_URL
+    if dual["enabled"] and provider and _normalize_provider(provider) == dual["fallback_provider"]:
+        url = (base_url or os.environ.get("COACH_LLM_FALLBACK_BASE_URL") or "").strip()
+        mdl = (model or os.environ.get("COACH_LLM_FALLBACK_MODEL") or "").strip()
     if not url:
         url = (preset.get("base_url") or "").strip()
     if not mdl:
@@ -156,6 +180,154 @@ def resolve_provider_config(
         "model": mdl,
         "label": preset.get("label") or prov or "unknown",
     }
+
+
+# 默认任务分流：中文表达类 → Qwen；结构化推理类 → DeepSeek
+DEFAULT_TASK_ROUTES: dict[str, str] = {
+    "resume.suggest": "qwen",
+    "resume.suggest.general": "qwen",
+    "resume.suggest.bullets": "qwen",
+    "resume.suggest.quantify": "qwen",
+    "resume.suggest.keywords": "qwen",
+    "interview.storybank": "qwen",
+    "interview.feedback": "qwen",
+    "interview.mock": "qwen",
+    "match.explain": "deepseek",
+    "readiness.assess": "deepseek",
+    "readiness.revise": "deepseek",
+}
+
+
+def _parse_task_routes() -> dict[str, str]:
+    raw = (os.environ.get("COACH_LLM_TASK_ROUTES") or "").strip()
+    routes = dict(DEFAULT_TASK_ROUTES)
+    if not raw:
+        return routes
+    try:
+        data = json.loads(raw)
+        if isinstance(data, dict):
+            for k, v in data.items():
+                if isinstance(k, str) and isinstance(v, str) and v.strip():
+                    routes[k] = _normalize_provider(v)
+    except json.JSONDecodeError:
+        pass
+    return routes
+
+
+def resolve_dual_routing() -> dict[str, Any]:
+    """双厂商一起调用：COACH_LLM_MODE=dual，或同时存在两家 Key 时自动启用。"""
+    mode = (os.environ.get("COACH_LLM_MODE") or "").strip().lower()
+    dash = (os.environ.get("DASHSCOPE_API_KEY") or "").strip()
+    ds = (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
+    shared = (os.environ.get("COACH_LLM_API_KEY") or "").strip()
+    fb_key = (os.environ.get("COACH_LLM_FALLBACK_API_KEY") or "").strip()
+    explicit_fb = _normalize_provider(os.environ.get("COACH_LLM_FALLBACK_PROVIDER") or "")
+    env_primary = _normalize_provider(os.environ.get("COACH_LLM_PROVIDER") or "")
+
+    has_qwen = bool(dash or (shared and env_primary in {"", "qwen", "dashscope", "qwen_max"}))
+    has_deepseek = bool(ds or (explicit_fb in {"deepseek", "deepseek_pro"} and (fb_key or ds)))
+    if fb_key and explicit_fb in {"deepseek", "deepseek_pro"}:
+        has_deepseek = True
+    if shared and env_primary in {"deepseek", "deepseek_pro"}:
+        has_deepseek = True
+        if not dash:
+            has_qwen = bool(dash)
+
+    auto_dual = bool(dash and ds)
+    want_dual = mode in {"dual", "both", "cascade", "qwen+deepseek", "deepseek+qwen"} or (
+        mode in {"", "auto"} and auto_dual
+    )
+    if mode == "single":
+        want_dual = False
+    if explicit_fb and (has_qwen or has_deepseek) and mode != "single":
+        # 显式配置了 fallback 也视为 dual
+        other = explicit_fb
+        if other and (dash or ds or shared or fb_key):
+            want_dual = want_dual or (bool(dash) and (bool(ds) or bool(fb_key) or other.startswith("deepseek")))
+
+    if mode == "deepseek+qwen":
+        primary, fallback = "deepseek", "qwen"
+    else:
+        primary = env_primary or "qwen"
+        fallback = explicit_fb or ("deepseek" if primary in {"qwen", "dashscope", "qwen_max"} else "qwen")
+
+    if primary == fallback:
+        fallback = "deepseek" if primary in {"qwen", "dashscope", "qwen_max"} else "qwen"
+
+    primary_key = _resolve_api_key(provider=primary, api_key=None, preset=PROVIDER_PRESETS.get(primary, {}))
+    fallback_key = fb_key or _resolve_api_key(
+        provider=fallback, api_key=None, preset=PROVIDER_PRESETS.get(fallback, {})
+    )
+    enabled = bool(want_dual and primary_key and fallback_key and primary != fallback)
+
+    return {
+        "enabled": enabled,
+        "mode": "dual" if enabled else (mode or "single"),
+        "primary_provider": primary,
+        "fallback_provider": fallback if enabled else "",
+        "task_routes": _parse_task_routes() if enabled else {},
+        "has_qwen_key": bool(dash or (shared and primary in {"qwen", "dashscope", "qwen_max"})),
+        "has_deepseek_key": bool(ds or (fallback_key and fallback.startswith("deepseek"))),
+    }
+
+
+def provider_for_task(task: str) -> str | None:
+    """dual 模式下按任务选首选厂商；未启用则 None。"""
+    dual = resolve_dual_routing()
+    if not dual["enabled"]:
+        return None
+    routes: dict[str, str] = dual["task_routes"]
+    t = (task or "").strip()
+    if t in routes:
+        return routes[t]
+    # 前缀匹配
+    for prefix, prov in routes.items():
+        if t.startswith(prefix.rstrip(".*")):
+            return prov
+    if t.startswith("resume.") or t.startswith("interview."):
+        return dual["primary_provider"]
+    if t.startswith("match.") or t.startswith("readiness."):
+        return dual["fallback_provider"]
+    return dual["primary_provider"]
+
+
+def ping_provider(provider: str, *, timeout: float = 20.0) -> dict[str, Any]:
+    """对单个厂商做最小连通性探测（返回 ok/error，不含密钥）。"""
+    cfg = resolve_provider_config(provider=provider)
+    if not cfg["api_key"]:
+        return {"provider": provider, "ok": False, "error": "missing_api_key", "model": cfg.get("model")}
+    try:
+        out = chat_completions_json(
+            system="只返回 JSON。",
+            user='返回 {"ok":true,"provider":"' + provider + '"}',
+            schema_name="ping",
+            task="ping",
+            provider=cfg["provider"],
+            api_key=cfg["api_key"],
+            base_url=cfg["base_url"],
+            model=cfg["model"],
+            timeout=timeout,
+            temperature=0,
+        )
+        return {
+            "provider": cfg["provider"],
+            "ok": True,
+            "model": cfg["model"],
+            "label": cfg["label"],
+            "sample": {k: out.get(k) for k in ("ok", "provider") if k in out},
+            "usage": {
+                "prompt_tokens": (out.get("_meta") or {}).get("prompt_tokens"),
+                "completion_tokens": (out.get("_meta") or {}).get("completion_tokens"),
+            },
+        }
+    except Exception as e:
+        return {
+            "provider": cfg["provider"],
+            "ok": False,
+            "model": cfg["model"],
+            "label": cfg["label"],
+            "error": str(e)[:300],
+        }
 
 
 def _extract_json_object(text: str) -> dict[str, Any]:
@@ -255,14 +427,22 @@ def llm_status() -> dict[str, Any]:
         "true",
         "yes",
     }
-    primary = resolve_provider_config()
-    fallback_provider = (os.environ.get("COACH_LLM_FALLBACK_PROVIDER") or "").strip().lower()
-    fallback_key = (os.environ.get("COACH_LLM_FALLBACK_API_KEY") or "").strip() or None
+    dual = resolve_dual_routing()
+    primary = resolve_provider_config(provider=dual["primary_provider"] if dual["enabled"] else None)
     fallback = None
-    if fallback_provider:
+    if dual["enabled"] and dual["fallback_provider"]:
+        fb_key = (os.environ.get("COACH_LLM_FALLBACK_API_KEY") or "").strip() or None
         fallback = resolve_provider_config(
-            provider=fallback_provider,
-            api_key=fallback_key,
+            provider=dual["fallback_provider"],
+            api_key=fb_key,
+            base_url=(os.environ.get("COACH_LLM_FALLBACK_BASE_URL") or None),
+            model=(os.environ.get("COACH_LLM_FALLBACK_MODEL") or None),
+        )
+    elif (os.environ.get("COACH_LLM_FALLBACK_PROVIDER") or "").strip():
+        fb_key = (os.environ.get("COACH_LLM_FALLBACK_API_KEY") or "").strip() or None
+        fallback = resolve_provider_config(
+            provider=os.environ.get("COACH_LLM_FALLBACK_PROVIDER"),
+            api_key=fb_key,
             base_url=(os.environ.get("COACH_LLM_FALLBACK_BASE_URL") or None),
             model=(os.environ.get("COACH_LLM_FALLBACK_MODEL") or None),
         )
@@ -270,6 +450,13 @@ def llm_status() -> dict[str, Any]:
     return {
         "force_rules": force_rules,
         "ready": ready,
+        "dual": {
+            "enabled": dual["enabled"],
+            "mode": dual["mode"],
+            "task_routes": dual.get("task_routes") or {},
+            "has_qwen_key": dual.get("has_qwen_key"),
+            "has_deepseek_key": dual.get("has_deepseek_key"),
+        },
         "primary": {
             "provider": primary["provider"],
             "base_url": primary["base_url"],
@@ -285,13 +472,13 @@ def llm_status() -> dict[str, Any]:
                 "label": fallback["label"],
                 "api_key_configured": bool(fallback["api_key"]),
             }
-            if fallback
+            if fallback and fallback.get("provider")
             else None
         ),
         "supported_providers": sorted(PROVIDER_PRESETS.keys()),
         "guides": PROVIDER_GUIDE,
         "setup_hint": (
-            "设置 COACH_FORCE_RULES=0，并配置 COACH_LLM_PROVIDER=qwen|deepseek "
-            "与 COACH_LLM_API_KEY（或 DASHSCOPE_API_KEY / DEEPSEEK_API_KEY）"
+            "双厂商：在 .env 填写 DASHSCOPE_API_KEY 与 DEEPSEEK_API_KEY，"
+            "并设 COACH_FORCE_RULES=0、COACH_LLM_MODE=dual；然后 GET /v1/llm/ping 检测"
         ),
     }

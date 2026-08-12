@@ -93,16 +93,33 @@ $env:COACH_LLM_API_KEY="sk-你的DeepSeekKey"
 # 注意：旧名 deepseek-chat / deepseek-reasoner 已退役，代码会自动迁移
 ```
 
-**主备双路由（Qwen 失败 → DeepSeek）**
+### 双厂商一起调用（推荐）
+
+同时配置两家 Key 后，系统会：
+
+1. **按任务分流**：简历/面试 → Qwen；匹配/准备度 → DeepSeek  
+2. **失败互备**：首选失败自动切另一家  
+3. **再失败** → 规则引擎
 
 ```powershell
-$env:COACH_LLM_PROVIDER="qwen"
-$env:COACH_LLM_API_KEY="sk-qwen"
-$env:COACH_LLM_FALLBACK_PROVIDER="deepseek"
-$env:COACH_LLM_FALLBACK_API_KEY="sk-deepseek"
+# 项目根目录创建 .env（可复制 .env.example）
+COACH_FORCE_RULES=0
+COACH_LLM_MODE=dual
+DASHSCOPE_API_KEY=sk-你的百炼Key
+DEEPSEEK_API_KEY=sk-你的DeepSeekKey
+COACH_LLM_PROVIDER=qwen
+COACH_LLM_FALLBACK_PROVIDER=deepseek
 ```
 
-也可使用厂商原生变量：`DASHSCOPE_API_KEY` / `DEEPSEEK_API_KEY`（未设 `COACH_LLM_API_KEY` 时生效）。
+验证：
+
+```text
+GET  /v1/llm/status   → dual.enabled=true, ready=true
+POST /v1/llm/ping     → 两家 all_ok=true（登录后调用，会产生微量费用）
+```
+
+只填一家 Key 时自动降级为单厂商；设 `COACH_LLM_MODE=single` 可强制单厂商。
+
 
 | 方法 | 路径 | 说明 |
 |---|---|---|

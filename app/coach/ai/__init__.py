@@ -1,11 +1,17 @@
-"""模型适配层：规则 fallback + OpenAI 兼容外接（Qwen/DeepSeek/自定义）。"""
+"""模型适配层：规则 fallback + OpenAI 兼容外接（Qwen/DeepSeek 双厂商）。"""
 
 from __future__ import annotations
 
 import os
 from typing import Any, Protocol
 
-from app.coach.ai.llm_client import chat_completions_json, llm_status, resolve_provider_config
+from app.coach.ai.llm_client import (
+    chat_completions_json,
+    llm_status,
+    provider_for_task,
+    resolve_dual_routing,
+    resolve_provider_config,
+)
 
 
 class ModelAdapter(Protocol):
@@ -57,7 +63,10 @@ class OpenAICompatibleAdapter:
         use_fallback_env: bool = False,
     ) -> None:
         if use_fallback_env:
-            provider = provider or (os.environ.get("COACH_LLM_FALLBACK_PROVIDER") or "").strip()
+            dual = resolve_dual_routing()
+            provider = provider or dual.get("fallback_provider") or (
+                os.environ.get("COACH_LLM_FALLBACK_PROVIDER") or ""
+            ).strip()
             api_key = api_key or (os.environ.get("COACH_LLM_FALLBACK_API_KEY") or None)
             base_url = base_url or (os.environ.get("COACH_LLM_FALLBACK_BASE_URL") or None)
             model = model or (os.environ.get("COACH_LLM_FALLBACK_MODEL") or None)
@@ -102,7 +111,10 @@ class CascadingAdapter:
     def __init__(self, primary: ModelAdapter, fallback: ModelAdapter | None = None) -> None:
         self.primary = primary
         self.fallback = fallback
-        self.model_version = getattr(primary, "model_version", "cascade")
+        self.model_version = (
+            f"cascade:{getattr(primary, 'model_version', '?')}"
+            + (f"+{getattr(fallback, 'model_version', '?')}" if fallback else "")
+        )
 
     def complete_json(
         self,
@@ -125,13 +137,87 @@ class CascadingAdapter:
             meta = out.setdefault("_meta", {})
             if isinstance(meta, dict):
                 meta["cascaded_from_error"] = str(first)[:200]
+                meta["cascade"] = True
             return out
 
 
-def get_model_adapter() -> ModelAdapter:
+class DualRoutingAdapter:
+    """双厂商：按 task 选首选，失败自动切另一家。"""
+
+    model_version = "dual"
+
+    def __init__(self, qwen: ModelAdapter, deepseek: ModelAdapter, *, default_primary: str = "qwen") -> None:
+        self.by_provider = {
+            "qwen": qwen,
+            "dashscope": qwen,
+            "qwen_max": qwen,
+            "deepseek": deepseek,
+            "deepseek_pro": deepseek,
+        }
+        self.default_primary = default_primary
+        self.model_version = (
+            f"dual:{getattr(qwen, 'model_version', 'qwen')}+{getattr(deepseek, 'model_version', 'deepseek')}"
+        )
+
+    def complete_json(
+        self,
+        *,
+        task: str,
+        system: str,
+        user: str,
+        schema_name: str,
+    ) -> dict[str, Any]:
+        preferred = provider_for_task(task) or self.default_primary
+        first = self.by_provider.get(preferred) or self.by_provider["qwen"]
+        second_name = "deepseek" if preferred in {"qwen", "dashscope", "qwen_max"} else "qwen"
+        second = self.by_provider.get(second_name)
+        try:
+            out = first.complete_json(task=task, system=system, user=user, schema_name=schema_name)
+            meta = out.setdefault("_meta", {})
+            if isinstance(meta, dict):
+                meta["route"] = preferred
+                meta["dual"] = True
+            return out
+        except Exception as first_err:
+            if not second:
+                raise
+            out = second.complete_json(task=task, system=system, user=user, schema_name=schema_name)
+            meta = out.setdefault("_meta", {})
+            if isinstance(meta, dict):
+                meta["route"] = second_name
+                meta["dual"] = True
+                meta["cascaded_from_error"] = str(first_err)[:200]
+            return out
+
+
+def _build_provider_adapter(provider: str) -> OpenAICompatibleAdapter:
+    dual = resolve_dual_routing()
+    if dual["enabled"] and provider == dual.get("fallback_provider"):
+        return OpenAICompatibleAdapter(
+            provider=provider,
+            api_key=(os.environ.get("COACH_LLM_FALLBACK_API_KEY") or None),
+            base_url=(os.environ.get("COACH_LLM_FALLBACK_BASE_URL") or None),
+            model=(os.environ.get("COACH_LLM_FALLBACK_MODEL") or None),
+        )
+    return OpenAICompatibleAdapter(provider=provider)
+
+
+def get_model_adapter(*, task: str | None = None) -> ModelAdapter:
     status = llm_status()
     if status["force_rules"] or not status["ready"]:
         return RuleBasedAdapter()
+    dual = resolve_dual_routing()
+    if dual["enabled"]:
+        qwen = _build_provider_adapter("qwen")
+        deepseek = _build_provider_adapter("deepseek")
+        # 若两边 key 都可用，走任务分流 + 互备
+        if qwen.api_key and deepseek.api_key:
+            return DualRoutingAdapter(qwen, deepseek, default_primary=dual["primary_provider"])
+        # 仅一家可用时 cascade
+        primary = _build_provider_adapter(dual["primary_provider"])
+        fallback = _build_provider_adapter(dual["fallback_provider"])
+        return CascadingAdapter(primary, fallback)
+
     primary = OpenAICompatibleAdapter()
     fb = status.get("fallback")
     if fb and fb.get("api_key_configured") and fb.get("base_url") and fb.get("model"):
@@ -147,7 +233,7 @@ def try_complete_json_or_none(
     schema_name: str,
 ) -> dict[str, Any] | None:
     """供 workflow 选用：LLM 不可用或失败时返回 None，由规则引擎接管。"""
-    adapter = get_model_adapter()
+    adapter = get_model_adapter(task=task)
     if isinstance(adapter, RuleBasedAdapter):
         return None
     try:

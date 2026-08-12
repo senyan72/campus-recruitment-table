@@ -46,6 +46,7 @@ def test_resolve_qwen_deepseek_presets():
 
 def test_vendor_key_env_fallback(monkeypatch):
     monkeypatch.delenv("COACH_LLM_API_KEY", raising=False)
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
     monkeypatch.setenv("DASHSCOPE_API_KEY", "sk-dash")
     q = resolve_provider_config(provider="qwen")
     assert q["api_key"] == "sk-dash"
@@ -53,6 +54,37 @@ def test_vendor_key_env_fallback(monkeypatch):
     monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-ds")
     d = resolve_provider_config(provider="deepseek")
     assert d["api_key"] == "sk-ds"
+
+
+def test_dual_mode_auto_when_both_keys(monkeypatch):
+    from app.coach.ai.llm_client import provider_for_task, resolve_dual_routing
+    from app.coach.ai import DualRoutingAdapter, get_model_adapter
+
+    monkeypatch.setenv("COACH_FORCE_RULES", "0")
+    monkeypatch.setenv("COACH_LLM_MODE", "dual")
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "sk-qwen-test")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-ds-test")
+    monkeypatch.delenv("COACH_LLM_API_KEY", raising=False)
+    dual = resolve_dual_routing()
+    assert dual["enabled"] is True
+    assert provider_for_task("resume.suggest.bullets") == "qwen"
+    assert provider_for_task("match.explain") == "deepseek"
+    adapter = get_model_adapter(task="match.explain")
+    assert isinstance(adapter, DualRoutingAdapter)
+
+
+def test_llm_ping_endpoint_reports_missing_keys(client, monkeypatch):
+    monkeypatch.setenv("COACH_FORCE_RULES", "0")
+    monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("COACH_LLM_API_KEY", raising=False)
+    h = _login(client)
+    r = client.post("/v1/llm/ping", headers=h)
+    assert r.status_code == 200
+    body = r.json()
+    assert "results" in body
+    # 无 key 时 ready 为 false，results 可能为空或均失败
+    assert body["all_ok"] is False or body["ready"] is False
 
 
 def test_extract_json_object():
