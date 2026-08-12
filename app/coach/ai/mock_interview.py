@@ -6,6 +6,7 @@ from typing import Any
 
 from app.coach.guardrails import ensure_disclaimer, reject_hire_probability_language
 from app.coach.knowledge import knowledge_context_for_interview
+from app.coach.ai import try_complete_json_or_none
 
 
 def build_questions(
@@ -41,6 +42,32 @@ def build_questions(
 def feedback_for_turn(*, question: dict[str, Any], answer: str) -> dict[str, Any]:
     text = (answer or "").strip()
     reject_hire_probability_language(text)
+    llm = try_complete_json_or_none(
+        task="interview.feedback",
+        schema_name="interview_feedback",
+        system="根据题目与回答输出反馈 JSON，字段: what_heard, working[], gaps[], priority_move, next_step, structure_ok, uses_experience, job_relevance, quote, question。不得编造经历。",
+        user=f"question={question}\nanswer={text}\nknowledge={knowledge_context_for_interview()}",
+    )
+    if isinstance(llm, dict) and llm.get("what_heard"):
+        try:
+            reject_hire_probability_language(str(llm))
+            return ensure_disclaimer(
+                {
+                    "what_heard": llm.get("what_heard"),
+                    "working": list(llm.get("working") or [])[:5],
+                    "gaps": list(llm.get("gaps") or [])[:5],
+                    "priority_move": llm.get("priority_move") or "补充证据后重答",
+                    "next_step": llm.get("next_step") or "进入下一题或重练本题",
+                    "structure_ok": bool(llm.get("structure_ok")),
+                    "uses_experience": bool(llm.get("uses_experience")),
+                    "job_relevance": llm.get("job_relevance") or "中",
+                    "quote": str(llm.get("quote") or text)[:80],
+                    "question": question.get("question"),
+                    "engine": "llm",
+                }
+            )
+        except ValueError:
+            pass
     structure_ok = len(text) >= 40
     uses_experience = any(k in text for k in ("我负责", "我做了", "项目", "实习", "结果"))
     strengths = []
@@ -66,6 +93,7 @@ def feedback_for_turn(*, question: dict[str, Any], answer: str) -> dict[str, Any
         "job_relevance": "中",
         "quote": text[:80],
         "question": question.get("question"),
+        "engine": "rules",
     }
     return ensure_disclaimer(fb)
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -10,8 +11,19 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from app.coach.ai import get_model_adapter, try_complete_json_or_none
+from app.coach.ai.llm_client import llm_status
 from app.coach.database import CoachDB
-from app.coach.knowledge import knowledge_context_for_interview, load_hr_basics
+from app.coach.knowledge import (
+    build_llm_knowledge_context,
+    knowledge_context_for_interview,
+    list_packs,
+    load_hr_basics,
+    search_knowledge,
+    upsert_hr_basic,
+    upsert_interview_track,
+    upsert_user_meta,
+)
 from app.coach.scope import (
     AI_COMPANION_CAPABILITIES,
     DEFERRED_INFRA,
@@ -34,6 +46,40 @@ class ConfirmFactsBody(BaseModel):
 
 class WorkflowRunBody(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class LlmCompleteBody(BaseModel):
+    task: str = Field(min_length=1, max_length=64)
+    schema_name: str = Field(default="generic", max_length=64)
+    system: str = ""
+    user: str = Field(min_length=1)
+    include_knowledge: bool = False
+    knowledge_track: str = "campus_general"
+    knowledge_query: str | None = None
+
+
+class InterviewTrackBody(BaseModel):
+    track: str = Field(min_length=1, max_length=64)
+    questions: list[dict[str, Any]]
+    merge: bool = True
+
+
+class HrBasicBody(BaseModel):
+    topic: str = Field(min_length=1, max_length=64)
+    content: str = Field(min_length=1)
+
+
+class KnowledgeMetaBody(BaseModel):
+    meta: dict[str, Any] = Field(default_factory=dict)
+
+
+def _knowledge_write_allowed(admin_token: str | None) -> None:
+    expected = (os.environ.get("COACH_ADMIN_TOKEN") or "").strip()
+    if not expected:
+        # 未配置时允许本地开发写入；生产请设置 COACH_ADMIN_TOKEN
+        return
+    if not admin_token or admin_token != expected:
+        raise HTTPException(403, "需要有效的 X-Coach-Admin-Token 才能写入知识库")
 
 
 def create_coach_app(*, db_path: str | None = None) -> FastAPI:
@@ -66,7 +112,49 @@ def create_coach_app(*, db_path: str | None = None) -> FastAPI:
             "capabilities": list(AI_COMPANION_CAPABILITIES),
             "human_coach_out_of_scope": list(HUMAN_COACH_OUT_OF_SCOPE),
             "deferred_infra": list(DEFERRED_INFRA),
+            "llm": llm_status(),
         }
+
+    @app.get("/v1/llm/status")
+    def get_llm_status() -> dict[str, Any]:
+        """查看 LLM 外接是否就绪（不返回密钥）。"""
+        status = llm_status()
+        status["adapter"] = getattr(get_model_adapter(), "model_version", "unknown")
+        return status
+
+    @app.post("/v1/llm/complete-json")
+    def llm_complete_json(
+        body: LlmCompleteBody,
+        user: dict[str, Any] = Depends(current_user),
+    ) -> dict[str, Any]:
+        """预留：直接调用外接 LLM 生成 JSON（需配置 Key；失败可返回 rules 提示）。"""
+        system = body.system
+        user_prompt = body.user
+        if body.include_knowledge:
+            kn = build_llm_knowledge_context(
+                track=body.knowledge_track,
+                query=body.knowledge_query,
+            )
+            user_prompt = (
+                f"{user_prompt}\n\n--- knowledge_context ---\n"
+                f"{kn}\n--- end knowledge_context ---\n"
+                f"仅可引用上述知识与用户已确认事实；缺失请标记 needs_proof/信息不足。"
+            )
+        out = try_complete_json_or_none(
+            task=body.task,
+            system=system,
+            user=user_prompt,
+            schema_name=body.schema_name,
+        )
+        if out is None:
+            return {
+                "ok": False,
+                "fallback": "rules",
+                "message": "LLM 未配置或调用失败；请设置 COACH_FORCE_RULES=0 与 COACH_LLM_*，或走 /v1/workflows 规则引擎",
+                "llm": llm_status(),
+                "user_id": user["id"],
+            }
+        return {"ok": True, "result": out, "user_id": user["id"]}
 
     @app.post("/v1/auth/dev-login")
     def dev_login(body: LoginBody, db: CoachDB = Depends(get_db)) -> dict[str, Any]:
@@ -156,13 +244,70 @@ def create_coach_app(*, db_path: str | None = None) -> FastAPI:
         )
         return {"document_id": doc_id, "version_id": ver_id, "extract": extracted}
 
+    @app.get("/v1/knowledge/packs")
+    def knowledge_packs() -> dict[str, Any]:
+        """内部知识库：内置包 + 用户可写包概览。"""
+        return list_packs()
+
     @app.get("/v1/knowledge/interview")
     def knowledge_interview(track: str = "campus_general", stage: str | None = None) -> dict[str, Any]:
         return knowledge_context_for_interview(track=track, stage=stage)
 
     @app.get("/v1/knowledge/hr")
-    def knowledge_hr() -> dict[str, Any]:
-        return {"items": load_hr_basics()}
+    def knowledge_hr(topic: str | None = None) -> dict[str, Any]:
+        return {"items": load_hr_basics(topic=topic)}
+
+    @app.get("/v1/knowledge/search")
+    def knowledge_search(q: str, limit: int = 10) -> dict[str, Any]:
+        return {"query": q, "hits": search_knowledge(query=q, limit=max(1, min(limit, 50)))}
+
+    @app.get("/v1/knowledge/context")
+    def knowledge_llm_context(
+        track: str = "campus_general",
+        stage: str | None = None,
+        q: str | None = None,
+    ) -> dict[str, Any]:
+        """给 LLM/workflow 组装用的知识上下文。"""
+        return build_llm_knowledge_context(track=track, stage=stage, query=q)
+
+    @app.put("/v1/knowledge/interview/{track}")
+    def knowledge_upsert_interview(
+        track: str,
+        body: InterviewTrackBody,
+        x_coach_admin_token: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        _knowledge_write_allowed(x_coach_admin_token)
+        try:
+            return upsert_interview_track(
+                track=body.track or track,
+                questions=body.questions,
+                merge=body.merge,
+            )
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+
+    @app.put("/v1/knowledge/hr/{topic}")
+    def knowledge_upsert_hr(
+        topic: str,
+        body: HrBasicBody,
+        x_coach_admin_token: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        _knowledge_write_allowed(x_coach_admin_token)
+        try:
+            return upsert_hr_basic(topic=body.topic or topic, content=body.content)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+
+    @app.put("/v1/knowledge/meta")
+    def knowledge_upsert_meta(
+        body: KnowledgeMetaBody,
+        x_coach_admin_token: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        _knowledge_write_allowed(x_coach_admin_token)
+        try:
+            return upsert_user_meta(body.meta)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
 
     @app.get("/v1/home/today")
     def today(
